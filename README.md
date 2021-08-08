@@ -1,2 +1,2 @@
 # Map2Hand
-GPS application using custom maps
+Android GPS application using custom maps
