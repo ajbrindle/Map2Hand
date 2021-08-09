@@ -44,7 +44,6 @@ import android.view.View;
 import android.view.View.OnTouchListener;
 
 import com.sk7software.map2hand.MapActivity;
-import com.sk7software.map2hand.R;
 
 /**
  * Displays an image subsampled as necessary to avoid loading too much image data into memory. After a pinch to zoom in,
@@ -60,9 +59,9 @@ import com.sk7software.map2hand.R;
  * v prefixes - coordinates, translations and distances measured in screen (view) pixels
  * s prefixes - coordinates, translations and distances measured in source image pixels (scaled)
  */
-public class SubsamplingScaleImageView extends View implements OnTouchListener {
+public class LegacySubsamplingScaleImageView extends View implements OnTouchListener {
 
-    private static final String TAG = SubsamplingScaleImageView.class.getSimpleName();
+    private static final String TAG = LegacySubsamplingScaleImageView.class.getSimpleName();
 
     // Max scale allowed (prevent infinite zoom)
     private float maxScale = 8F;
@@ -117,12 +116,12 @@ public class SubsamplingScaleImageView extends View implements OnTouchListener {
     
     private int edgeFlag = 0;
 
-    public SubsamplingScaleImageView(Context context, AttributeSet attr) {
+    public LegacySubsamplingScaleImageView(Context context, AttributeSet attr) {
         super(context, attr);
         this.context = context;
     }
 
-    public SubsamplingScaleImageView(Context context) {
+    public LegacySubsamplingScaleImageView(Context context) {
         super(context);
         this.context = context;
     }
@@ -622,14 +621,14 @@ public class SubsamplingScaleImageView extends View implements OnTouchListener {
      * Async task used to get image details without blocking the UI thread.
      */
     private static class BitmapInitTask extends AsyncTask<Void, Void, Point> {
-        private final WeakReference<SubsamplingScaleImageView> viewRef;
+        private final WeakReference<LegacySubsamplingScaleImageView> viewRef;
         private final WeakReference<Context> contextRef;
         private final String source;
         private final boolean sourceIsAsset;
         private WeakReference<BitmapRegionDecoder> decoderRef;
 
-        public BitmapInitTask(SubsamplingScaleImageView view, Context context, String source, boolean sourceIsAsset) {
-            this.viewRef = new WeakReference<SubsamplingScaleImageView>(view);
+        public BitmapInitTask(LegacySubsamplingScaleImageView view, Context context, String source, boolean sourceIsAsset) {
+            this.viewRef = new WeakReference<LegacySubsamplingScaleImageView>(view);
             this.contextRef = new WeakReference<Context>(context);
             this.source = source;
             this.sourceIsAsset = sourceIsAsset;
@@ -660,10 +659,10 @@ public class SubsamplingScaleImageView extends View implements OnTouchListener {
         @Override
         protected void onPostExecute(Point point) {
             if (viewRef != null && decoderRef != null) {
-                final SubsamplingScaleImageView subsamplingScaleImageView = viewRef.get();
+                final LegacySubsamplingScaleImageView legacySubsamplingScaleImageView = viewRef.get();
                 final BitmapRegionDecoder decoder = decoderRef.get();
-                if (subsamplingScaleImageView != null && decoder != null && point != null) {
-                    subsamplingScaleImageView.onImageInited(decoder, point.x, point.y);
+                if (legacySubsamplingScaleImageView != null && decoder != null && point != null) {
+                    legacySubsamplingScaleImageView.onImageInited(decoder, point.x, point.y);
                 }
             }
         }
@@ -673,12 +672,12 @@ public class SubsamplingScaleImageView extends View implements OnTouchListener {
      * Async task used to load images without blocking the UI thread.
      */
     private static class BitmapTileTask extends AsyncTask<Void, Void, Bitmap> {
-        private final WeakReference<SubsamplingScaleImageView> viewRef;
+        private final WeakReference<LegacySubsamplingScaleImageView> viewRef;
         private final WeakReference<BitmapRegionDecoder> decoderRef;
         private final WeakReference<Tile> tileRef;
 
-        public BitmapTileTask(SubsamplingScaleImageView view, BitmapRegionDecoder decoder, Tile tile) {
-            this.viewRef = new WeakReference<SubsamplingScaleImageView>(view);
+        public BitmapTileTask(LegacySubsamplingScaleImageView view, BitmapRegionDecoder decoder, Tile tile) {
+            this.viewRef = new WeakReference<LegacySubsamplingScaleImageView>(view);
             this.decoderRef = new WeakReference<BitmapRegionDecoder>(decoder);
             this.tileRef = new WeakReference<Tile>(tile);
             tile.loading = true;
@@ -708,12 +707,12 @@ public class SubsamplingScaleImageView extends View implements OnTouchListener {
         @Override
         protected void onPostExecute(Bitmap bitmap) {
             if (viewRef != null && tileRef != null && bitmap != null) {
-                final SubsamplingScaleImageView subsamplingScaleImageView = viewRef.get();
+                final LegacySubsamplingScaleImageView legacySubsamplingScaleImageView = viewRef.get();
                 final Tile tile = tileRef.get();
-                if (subsamplingScaleImageView != null && tile != null) {
+                if (legacySubsamplingScaleImageView != null && tile != null) {
                     tile.bitmap = bitmap;
                     tile.loading = false;
-                    subsamplingScaleImageView.onTileLoaded();
+                    legacySubsamplingScaleImageView.onTileLoaded();
                 }
             }
         }

@@ -1,11 +1,13 @@
 package com.sk7software.map2hand;
 
-import java.io.IOException;
 import java.util.Calendar;
 import java.util.Date;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.graphics.Point;
 import android.graphics.PointF;
 import android.location.Location;
 import android.location.LocationListener;
@@ -14,9 +16,13 @@ import android.os.Bundle;
 import android.os.PowerManager;
 import android.util.Log;
 import android.view.Window;
+import android.view.WindowMetrics;
 
+import androidx.core.app.ActivityCompat;
+
+import com.davemorrissey.labs.subscaleview.ImageSource;
 import com.sk7software.map2hand.util.SystemUiHider;
-import com.sk7software.scaleview.SubsamplingScaleImageView;
+import com.sk7software.map2hand.view.MapView;
 
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
@@ -27,13 +33,13 @@ import com.sk7software.scaleview.SubsamplingScaleImageView;
 public class MapActivity extends Activity {
 
 	private static final String STATE_SCALE = "state-scale";
-    private static final String STATE_CENTER_X = "state-center-x";
-    private static final String STATE_CENTER_Y = "state-center-y";
-    private static final String STATE_MAP_NAME = "state-map";
-    
-    private static final String TAG = MapActivity.class.getSimpleName();
+	private static final String STATE_CENTER_X = "state-center-x";
+	private static final String STATE_CENTER_Y = "state-center-y";
+	private static final String STATE_MAP_NAME = "state-map";
 
-    // Time between updates to the location manager (in seconds)
+	private static final String TAG = MapActivity.class.getSimpleName();
+
+	// Time between updates to the location manager (in seconds)
 	private static final int LM_UPDATE_INTERVAL = 2;
 
 	// Network update intervals
@@ -41,24 +47,21 @@ public class MapActivity extends Activity {
 	private static final long UPDATE_INTERVAL_MS = 300000;
 	private int newfile = 1;  // Indicates whether a new file should be created on the web server
 
-    private LocationManager lm;
-    private LocationListener locationListener;
-	private MapFile currentMap; 
+	private LocationManager lm;
+	private LocationListener locationListener;
+	private MapFile currentMap;
 	protected PowerManager.WakeLock mWakeLock;
-	
-//	private static final Ellipsoid ellip = new Ellipsoid(10, "GRS 1980", 6378137.0, 6356752.31414);
-//	private static final Projection projn = new Projection(1, "UK National Grid", 400000.0, -100000.0, (49.0*Math.PI/180.0), (-2.0*Math.PI/180.0), 0.9996013, e, Projection.SYS_TYPE_TM);
 
-	private SubsamplingScaleImageView imageView = null;
+	private MapView mapView = null;
 	private boolean mapLoading = false;
 	private long panEndTime = 0;
-	
+
 	public static final int TOP_EDGE = 0x01;
 	public static final int LEFT_EDGE = 0x02;
 	public static final int BOTTOM_EDGE = 0x04;
 	public static final int RIGHT_EDGE = 0x08;
-	
-//	/**
+
+	//	/**
 //     * Whether or not the system UI should be auto-hidden after
 //     * {@link #AUTO_HIDE_DELAY_MILLIS} milliseconds.
 //     */
@@ -86,60 +89,69 @@ public class MapActivity extends Activity {
 //     */
 //    private SystemUiHider mSystemUiHider;
 //
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-    	boolean restoreState = false;
-        Log.d(TAG, "onCreate");
+	@Override
+	protected void onCreate(Bundle savedInstanceState) {
+		boolean restoreState = false;
+		Log.d(TAG, "onCreate");
 
-    	super.onCreate(savedInstanceState);
-    	this.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        setContentView(R.layout.activity_map);
+		super.onCreate(savedInstanceState);
+		this.requestWindowFeature(Window.FEATURE_NO_TITLE);
+		setContentView(R.layout.activity_map);
 
-        // Name of map
-        Intent mapIntent = getIntent();
-        String mapName = mapIntent.getStringExtra("map");
-        currentMap = MapController.getMapByName(mapName);
-        //currentMapName = mapName;
+		// Name of map
+		Intent mapIntent = getIntent();
+		String mapName = mapIntent.getStringExtra("map");
+		currentMap = MapController.getMapByName(mapName);
 
-        // Restore state
-        if (savedInstanceState != null &&
-	        savedInstanceState.containsKey(STATE_SCALE) &&
-	        savedInstanceState.containsKey(STATE_CENTER_X) &&
-	        savedInstanceState.containsKey(STATE_CENTER_Y)) {
-        	
-        	restoreState = true;
-        	currentMap = MapController.getMapByName(savedInstanceState.getString(STATE_MAP_NAME));
-        }
-        
-        mapLoading = true;
-        loadNewMap(currentMap, restoreState);
-    	
-        if (restoreState) {
-	    	imageView.setScaleAndCenter(savedInstanceState.getFloat(STATE_SCALE), 
+		// Restore state
+		if (savedInstanceState != null &&
+				savedInstanceState.containsKey(STATE_SCALE) &&
+				savedInstanceState.containsKey(STATE_CENTER_X) &&
+				savedInstanceState.containsKey(STATE_CENTER_Y)) {
+
+			restoreState = true;
+			currentMap = MapController.getMapByName(savedInstanceState.getString(STATE_MAP_NAME));
+		}
+
+		mapLoading = true;
+		loadNewMap(currentMap, restoreState);
+
+		if (restoreState) {
+			mapView.setScaleAndCenter(savedInstanceState.getFloat(STATE_SCALE),
 					new PointF(savedInstanceState.getFloat(STATE_CENTER_X), savedInstanceState.getFloat(STATE_CENTER_Y)));
-        }
-    }
+		}
+	}
 
-    @Override
-    protected void onStart() {
-    	super.onStart();
-    }
-    
-    @Override
-    protected void onResume() {        
-        Log.d(TAG, "onResume");
-    	super.onResume();
-    	
-        // Start location listener
-        lm = (LocationManager)getSystemService(LOCATION_SERVICE);    
-            
-            locationListener = new MapLocationListener();
-            
-            lm.requestLocationUpdates(
-                LocationManager.GPS_PROVIDER, 
-                LM_UPDATE_INTERVAL * 1000, 
-                0, 
-                locationListener);        
+	@Override
+	protected void onStart() {
+		super.onStart();
+	}
+
+	@Override
+	protected void onResume() {
+		Log.d(TAG, "onResume");
+		super.onResume();
+
+		// Start location listener
+		lm = (LocationManager) getSystemService(LOCATION_SERVICE);
+
+		locationListener = new MapLocationListener();
+
+		if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+			// TODO: Consider calling
+			//    ActivityCompat#requestPermissions
+			// here to request the missing permissions, and then overriding
+			//   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+			//                                          int[] grantResults)
+			// to handle the case where the user grants the permission. See the documentation
+			// for ActivityCompat#requestPermissions for more details.
+			return;
+		}
+		lm.requestLocationUpdates(
+				LocationManager.GPS_PROVIDER,
+				LM_UPDATE_INTERVAL * 1000,
+				0,
+				locationListener);
     }
 
     @Override
@@ -169,10 +181,9 @@ public class MapActivity extends Activity {
         super.onSaveInstanceState(outState);
         Log.d(TAG, "onSaveInstanceState");
 
-        //SubsamplingScaleImageView imageView = (SubsamplingScaleImageView)findViewById(R.id.imageView);
-        outState.putFloat(STATE_SCALE, imageView.getScale());
+        outState.putFloat(STATE_SCALE, mapView.getScale());
         outState.putString(STATE_MAP_NAME, currentMap.getName());
-        PointF center = imageView.getCenter();
+        PointF center = mapView.getCenter();
         if (center != null) {
             outState.putFloat(STATE_CENTER_X, center.x);
             outState.putFloat(STATE_CENTER_Y, center.y);
@@ -188,7 +199,7 @@ public class MapActivity extends Activity {
     {
         //@Override
         public synchronized void onLocationChanged(Location loc) {
-            if (loc != null && !mapLoading && !isPanning()) {
+            if (loc != null && mapView.isReady()) {
             	// Check lat and lon are > 0
             	if (Math.abs(loc.getLatitude()) > 0.001 && Math.abs(loc.getLongitude()) > 0.001) {
             		
@@ -216,12 +227,17 @@ public class MapActivity extends Activity {
 		                PointF mapPoint = new PointF();
 		                mapPoint.x = (float)((geoLoc.getEasting() - currentMap.getTopLeftE())/currentMap.getResolution());
 		                mapPoint.y = (float)((currentMap.getTopLeftN() - geoLoc.getNorthing())/currentMap.getResolution());
-		                Log.d(TAG, "Map point: " + mapPoint.x + "," + mapPoint.y);
-	            		imageView.setGeoLocation(mapPoint);
-		                if (imageView != null) {
+		                mapView.setScaleAndCenter(mapView.getScale(), mapPoint);
+
+						Point screenSize = new Point();
+						WindowMetrics windowMetrics = getWindowManager().getCurrentWindowMetrics();
+	            		mapView.setGeoLocation(mapPoint);
+						mapView.invalidate();
+
+		                if (mapView != null) {
 		                	if (newMapLoaded) {
 		                		Log.d(TAG, "Rescaling new map");
-		                		imageView.setScaleAndCenter(1.0F, mapPoint);	
+		                		mapView.setScaleAndCenter(1.0F, mapPoint);
 		                	}
 		                	
 		                	uploadPosition(loc);
@@ -275,14 +291,14 @@ public class MapActivity extends Activity {
 
     public void loadNewMap(MapFile map, boolean restoreState) {
         try {
-	        imageView = (SubsamplingScaleImageView)findViewById(R.id.imageView);
-	        imageView.setMap(this);
-	        imageView.setImageFile(map.getFullPath());
-	        
+	        mapView = (MapView) findViewById(R.id.mapView);
+	        mapView.setImage(ImageSource.uri(map.getFullPath()));
+	        mapView.setMaxScale(50);
+
 	        if (!restoreState) {
-	        	imageView.setScaleAndCenter(1.0F, new PointF(map.getWidthPix()/2, map.getHeightPix()/2));
+	        	mapView.setScaleAndCenter(1.0F, new PointF(map.getWidthPix()/2, map.getHeightPix()/2));
 	        }
-        } catch (IOException e) {
+		} catch (Exception e) {
         	Log.d(MapActivity.class.getSimpleName(), "Could not load map", e);
         }       	
     }
