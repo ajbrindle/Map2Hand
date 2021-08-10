@@ -273,7 +273,6 @@ public class LegacySubsamplingScaleImageView extends View implements OnTouchList
                     // Start one-finger pan
                     vTranslateStart = new PointF(vTranslate.x, vTranslate.y);
                     vCenterStart = new PointF(event.getX(), event.getY());
-                    map.setMapPanning(true, false);
                 }
             case MotionEvent.ACTION_MOVE:
                 if (touchCount >= 2 && isZooming) {
@@ -299,7 +298,6 @@ public class LegacySubsamplingScaleImageView extends View implements OnTouchList
                     vTranslate.y = vTranslateStart.y + (event.getY() - vCenterStart.y);
                     fitToBounds();
                     refreshRequiredTiles(false);
-                    map.setMapPanning(true, isZooming);
                 }
                 invalidate();
                 break;
@@ -312,7 +310,6 @@ public class LegacySubsamplingScaleImageView extends View implements OnTouchList
                 // Trigger load of tiles now required
                 refreshRequiredTiles(true);
             	Log.d(TAG, "End panning");
-            	map.setMapPanning(false, isZooming);
                 break;
         }
         return true;

@@ -7,13 +7,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.location.Location;
-import android.os.Environment;
 import android.util.Log;
+
+import com.sk7software.map2hand.db.Database;
+import com.sk7software.map2hand.geo.GeoLocation;
 
 public class MapController {
 

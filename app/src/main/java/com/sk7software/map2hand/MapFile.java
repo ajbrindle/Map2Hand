@@ -1,8 +1,10 @@
 package com.sk7software.map2hand;
 
-import android.content.Context;
 import android.graphics.BitmapFactory;
 import android.util.Log;
+
+import com.sk7software.map2hand.db.Database;
+import com.sk7software.map2hand.geo.Projection;
 
 public class MapFile {
 	private String name;
@@ -13,11 +15,13 @@ public class MapFile {
 	private double resolution;
 	private Projection projection;
 
-	// public static final String MAP_DIR = android.os.Environment.getExternalStorageDirectory().getPath() + "/Android/data/com.sk7software/";
-	// public static final String MAP_DIR = "/mnt/extSdCard/Android/data/com.sk7software/";
-	//-- public static final String MAP_DIR = "/storage/5949-D1CA/Android/data/com.sk7software/";
+	//public static final String MAP_DIR = android.os.Environment.getExternalStorageDirectory().getPath() + "/Android/data/com.sk7software/";
+	//public static final String MAP_DIR = "/mnt/extSdCard/Android/data/com.sk7software/";
+	//public static final String MAP_DIR = "/Android/data/com.sk7software/";
 	// public static final String MAP_DIR = "/storage/sdcard1/Android/data/com.sk7software/";
-	public static final String MAP_DIR = "/data/data/com.sk7software.map2hand/";
+	//public static final String MAP_DIR = "/data/data/com.sk7software.map2hand/";
+	public static final String MAP_DIR = "/sdcard/Android/data/com.sk7software.map2hand/";
+
 	private static final String JPG_EXT = ".jpg";
 	private static final String TAG = MapFile.class.getSimpleName();
 	

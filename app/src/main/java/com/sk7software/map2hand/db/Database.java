@@ -1,4 +1,4 @@
-package com.sk7software.map2hand;
+package com.sk7software.map2hand.db;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -8,6 +8,10 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.util.Log;
+
+import com.sk7software.map2hand.ApplicationContextProvider;
+import com.sk7software.map2hand.geo.Ellipsoid;
+import com.sk7software.map2hand.geo.Projection;
 
 public class Database extends SQLiteOpenHelper {
 	

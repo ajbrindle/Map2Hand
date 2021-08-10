@@ -1,4 +1,4 @@
-package com.sk7software.map2hand;
+package com.sk7software.map2hand.geo;
 
 public class GeoLocation {
 

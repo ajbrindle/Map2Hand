@@ -7,20 +7,28 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Point;
+import android.graphics.Color;
 import android.graphics.PointF;
+import android.graphics.drawable.Drawable;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.util.Log;
+import android.view.View;
 import android.view.Window;
-import android.view.WindowMetrics;
+import android.widget.Button;
 
 import androidx.core.app.ActivityCompat;
 
 import com.davemorrissey.labs.subscaleview.ImageSource;
+import com.google.android.material.button.MaterialButton;
+import com.sk7software.map2hand.geo.GPXRoute;
+import com.sk7software.map2hand.geo.GeoConvert;
+import com.sk7software.map2hand.geo.GeoLocation;
+import com.sk7software.map2hand.net.NetworkRequest;
+import com.sk7software.map2hand.net.WebRequest;
 import com.sk7software.map2hand.util.SystemUiHider;
 import com.sk7software.map2hand.view.MapView;
 
@@ -50,11 +58,12 @@ public class MapActivity extends Activity {
 	private LocationManager lm;
 	private LocationListener locationListener;
 	private MapFile currentMap;
+	private GPXRoute currentRoute;
 	protected PowerManager.WakeLock mWakeLock;
+	private Button gpsButton;
+	private boolean gpsListen = true;
 
 	private MapView mapView = null;
-	private boolean mapLoading = false;
-	private long panEndTime = 0;
 
 	public static final int TOP_EDGE = 0x01;
 	public static final int LEFT_EDGE = 0x02;
@@ -103,6 +112,24 @@ public class MapActivity extends Activity {
 		String mapName = mapIntent.getStringExtra("map");
 		currentMap = MapController.getMapByName(mapName);
 
+		gpsButton = (Button)findViewById(R.id.gpsButton);
+		gpsButton.setOnClickListener(new View.OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				if (gpsListen) {
+					// Switch off
+					gpsListen = false;
+					gpsButton.setBackground(getDrawable(R.drawable.button_unselected));
+					gpsButton.setTextColor(Color.BLACK);
+				} else {
+					// Switch on
+					gpsListen = true;
+					gpsButton.setBackground(getDrawable(R.drawable.button_selected));
+					gpsButton.setTextColor(Color.WHITE);
+				}
+			}
+		});
+
 		// Restore state
 		if (savedInstanceState != null &&
 				savedInstanceState.containsKey(STATE_SCALE) &&
@@ -113,8 +140,10 @@ public class MapActivity extends Activity {
 			currentMap = MapController.getMapByName(savedInstanceState.getString(STATE_MAP_NAME));
 		}
 
-		mapLoading = true;
 		loadNewMap(currentMap, restoreState);
+
+		String routeName = mapIntent.getStringExtra("route");
+		setCurrentRoute(routeName);
 
 		if (restoreState) {
 			mapView.setScaleAndCenter(savedInstanceState.getFloat(STATE_SCALE),
@@ -190,6 +219,27 @@ public class MapActivity extends Activity {
         }
     }
 
+    private void setCurrentRoute(String routeName) {
+		if (routeName == null || "".equals(routeName)) {
+			return;
+		}
+
+		NetworkRequest.fetchGPX(ApplicationContextProvider.getContext(), routeName, new NetworkRequest.NetworkCallback() {
+			@Override
+			public void onRequestCompleted(Object callbackData) {
+				currentRoute = (GPXRoute)callbackData;
+				if (currentRoute != null) {
+					currentRoute.calcXY(currentMap, 0);
+					mapView.setRoute(currentRoute);
+				}
+			}
+
+			@Override
+			public void onError(Exception e) {
+
+			}
+		});
+	}
 	/************************************************************
 	 * MyLocationListener nested class
 	 * @author Andrew
@@ -199,7 +249,7 @@ public class MapActivity extends Activity {
     {
         //@Override
         public synchronized void onLocationChanged(Location loc) {
-            if (loc != null && mapView.isReady()) {
+            if (loc != null && mapView.isReady() && gpsListen) {
             	// Check lat and lon are > 0
             	if (Math.abs(loc.getLatitude()) > 0.001 && Math.abs(loc.getLongitude()) > 0.001) {
             		
@@ -216,32 +266,33 @@ public class MapActivity extends Activity {
 		                // Check for better map
 		                MapFile newMap = MapController.getBestMap(geoLoc);
 		                if (newMap != null && !newMap.equals(currentMap)) {
-		                	mapLoading = true;
 		                	Log.d(TAG, "Loading map: " + newMap.getName());
 		                	currentMap = newMap;
 		                	loadNewMap(newMap, false);
+							if (currentRoute != null) {
+								currentRoute.calcXY(currentMap, 0);
+								mapView.setRoute(currentRoute);
+							}
 		                	newMapLoaded = true;
 		                }
 		                
-		                // Show location on map
-		                PointF mapPoint = new PointF();
-		                mapPoint.x = (float)((geoLoc.getEasting() - currentMap.getTopLeftE())/currentMap.getResolution());
-		                mapPoint.y = (float)((currentMap.getTopLeftN() - geoLoc.getNorthing())/currentMap.getResolution());
-		                mapView.setScaleAndCenter(mapView.getScale(), mapPoint);
+						if (Calendar.getInstance().getTimeInMillis() > mapView.getPanDelay() || newMapLoaded) {
+							// Show location on map
+							PointF mapPoint = new PointF();
+							mapPoint.x = (float) ((geoLoc.getEasting() - currentMap.getTopLeftE()) / currentMap.getResolution());
+							mapPoint.y = (float) ((currentMap.getTopLeftN() - geoLoc.getNorthing()) / currentMap.getResolution());
+							mapView.setGeoLocation(mapPoint);
+							mapView.setScaleAndCenter(mapView.getScale(), mapPoint);
+							mapView.invalidate();
 
-						Point screenSize = new Point();
-						WindowMetrics windowMetrics = getWindowManager().getCurrentWindowMetrics();
-	            		mapView.setGeoLocation(mapPoint);
-						mapView.invalidate();
-
-		                if (mapView != null) {
-		                	if (newMapLoaded) {
-		                		Log.d(TAG, "Rescaling new map");
-		                		mapView.setScaleAndCenter(1.0F, mapPoint);
-		                	}
-		                	
-		                	uploadPosition(loc);
-		                }
+							if (mapView != null) {
+								if (newMapLoaded) {
+									Log.d(TAG, "Rescaling new map");
+									mapView.setScaleAndCenter(1.0F, mapPoint);
+								}
+								uploadPosition(loc);
+							}
+						}
 	        		}
 	        		
 	        		
@@ -304,26 +355,6 @@ public class MapActivity extends Activity {
     }
 
     public void clearUpdating() {
-    	mapLoading = false;
-    }
-    
-    public void setMapPanning(boolean pan, boolean endNow) {
-		if (endNow) {
-			panEndTime = 0;
-		} else {
-    		panEndTime = Calendar.getInstance().getTimeInMillis() + 5000;
-		}
-    }
-
-    private boolean isPanning() {
-    	Log.d(TAG, "Check is panning: " + panEndTime);
-    	if (panEndTime == 0) return false;
-		if (Calendar.getInstance().getTimeInMillis() > panEndTime) {
-    		panEndTime = 0;
-    		return false;
-		} else {
-			return true;
-		}    	
     }
     
     @Override

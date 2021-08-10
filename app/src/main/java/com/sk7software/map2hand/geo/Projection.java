@@ -1,6 +1,6 @@
-package com.sk7software.map2hand;
+package com.sk7software.map2hand.geo;
 
-import android.database.sqlite.SQLiteDatabase;
+import com.sk7software.map2hand.geo.Ellipsoid;
 
 public class Projection {
 	private int id;

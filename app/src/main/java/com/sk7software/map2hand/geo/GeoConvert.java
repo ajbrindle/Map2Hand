@@ -1,4 +1,4 @@
-package com.sk7software.map2hand;
+package com.sk7software.map2hand.geo;
 
 /*
 int ConvertGridToLL(DmOpenRef refDB, double east, double north, int projSys, int zone,
