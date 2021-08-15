@@ -1,6 +1,8 @@
 package com.sk7software.map2hand;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.Menu;
@@ -18,13 +20,21 @@ import com.sk7software.map2hand.net.NetworkRequest;
 import java.util.ArrayList;
 import java.util.List;
 
-public class RouteListActivity extends Activity {
+public class RouteListActivity extends Activity implements ActivityUpdateInterface {
+    private AlertDialog.Builder progressDialogBuilder;
+    private Dialog progressDialog;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_map_list);
         // Show the Up button in the action bar.
         setupActionBar();
+
+        // Create progress dialog for use later
+        progressDialogBuilder = new AlertDialog.Builder(RouteListActivity.this);
+        progressDialogBuilder.setView(R.layout.progress);
+
         initGPXFileList(this);
     }
 
@@ -43,7 +53,8 @@ public class RouteListActivity extends Activity {
     }
 
     private void initGPXFileList(final Activity activity) {
-        NetworkRequest.fetchGPXFiles(ApplicationContextProvider.getContext(), new NetworkRequest.NetworkCallback() {
+        setProgress(true, "Fetching Routes");
+        NetworkRequest.fetchGPXFiles(ApplicationContextProvider.getContext(), this, new NetworkRequest.NetworkCallback() {
             @Override
             public void onRequestCompleted(Object callbackData) {
                 GPXFiles files = (GPXFiles)callbackData;
@@ -69,5 +80,19 @@ public class RouteListActivity extends Activity {
             public void onError(Exception e) {
             }
         });
+    }
+
+    @Override
+    public void setProgress(boolean showProgressDialog, String progressMessage) {
+        if (showProgressDialog) {
+            progressDialog = progressDialogBuilder
+                    .setMessage(progressMessage)
+                    .create();
+            progressDialog.show();
+        } else {
+            if (progressDialog != null) {
+                progressDialog.dismiss();
+            }
+        }
     }
 }

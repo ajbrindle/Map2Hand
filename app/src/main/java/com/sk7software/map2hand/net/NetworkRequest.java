@@ -13,6 +13,7 @@ import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sk7software.map2hand.ActivityUpdateInterface;
 import com.sk7software.map2hand.db.GPXFile;
 import com.sk7software.map2hand.db.GPXFiles;
 import com.sk7software.map2hand.geo.GPXRoute;
@@ -83,7 +84,7 @@ public class NetworkRequest {
         }
     }
 
-    public static void fetchGPXFiles(final Context context, final NetworkCallback callback) {
+    public static void fetchGPXFiles(final Context context, ActivityUpdateInterface uiUpdate, final NetworkCallback callback) {
         // Set start and end points before serialising and removing other points
         Log.d(TAG, "Fetching GPX file list");
         try {
@@ -97,6 +98,7 @@ public class NetworkRequest {
                                         ObjectMapper mapper = new ObjectMapper();
                                         GPXFiles files = new GPXFiles();
                                         files.setFiles(Arrays.asList(mapper.readValue(response.toString(), GPXFile[].class)));
+                                        uiUpdate.setProgress(false, null);
                                         callback.onRequestCompleted(files);
                                     } catch (JsonProcessingException e) {
                                         Log.d(TAG, "Error getting dev messages: " + e.getMessage());
@@ -107,6 +109,7 @@ public class NetworkRequest {
                                 @Override
                                 public void onErrorResponse(VolleyError error) {
                                     Log.d(TAG, "Error => " + error.toString());
+                                    uiUpdate.setProgress(false, null);
                                     callback.onError(error);
                                 }
                             }
@@ -114,6 +117,7 @@ public class NetworkRequest {
             jsObjRequest.setRetryPolicy(new DefaultRetryPolicy(5000, 1, 1));
             getQueue(context).add(jsObjRequest);
         } catch (Exception e) {
+            uiUpdate.setProgress(false, null);
             Log.d(TAG, "Error fetching GPX route: " + e.getMessage());
         }
     }
