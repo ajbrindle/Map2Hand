@@ -19,7 +19,8 @@
         android:id="@+id/routeList"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@id/mapList">
+        android:layout_below="@id/mapList"
+        android:layout_marginTop="20dp">
     </ListView>
 
     <Button

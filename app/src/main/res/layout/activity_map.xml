@@ -14,12 +14,138 @@
         android:layout_height="fill_parent"/>
 
     <Button
-        android:id="@+id/gpsButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:id="@+id/btnMenu"
+        android:layout_width="30dp"
+        android:layout_height="30dp"
+        android:layout_alignParentLeft="true"
+        android:layout_marginTop="5dp"
+        android:layout_marginLeft="5dp"
+        android:background="@drawable/ic_bars_solid"/>
+    <Button
+        android:id="@+id/zoomInButton"
+        android:layout_width="35dp"
+        android:layout_height="35dp"
+        android:layout_alignParentRight="true"
+        android:layout_marginRight="5dp"
+        android:layout_marginTop="5dp"
+        android:background="@drawable/ic_search_plus_solid"
+        android:visibility="invisible"/>
+    <Button
+        android:id="@+id/zoomOutButton"
+        android:layout_width="35dp"
+        android:layout_height="35dp"
+        android:layout_toLeftOf="@id/zoomInButton"
+        android:layout_marginRight="5dp"
+        android:layout_marginTop="5dp"
+        android:background="@drawable/ic_search_minus_solid"
+        android:visibility="invisible"/>
+    <Button
+        android:id="@+id/upButton"
+        android:layout_width="35dp"
+        android:layout_height="35dp"
         android:layout_centerHorizontal="true"
         android:layout_marginTop="5dp"
-        android:background="@drawable/button_selected"
-        android:textColor="#ffffff"
-        android:text="GPS" />
+        android:background="@drawable/ic_chevron_circle_up_solid"
+        android:visibility="invisible"/>
+    <Button
+        android:id="@+id/downButton"
+        android:layout_width="35dp"
+        android:layout_height="35dp"
+        android:layout_centerHorizontal="true"
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="5dp"
+        android:background="@drawable/ic_chevron_circle_down_solid"
+        android:visibility="invisible"/>
+    <Button
+        android:id="@+id/leftButton"
+        android:layout_width="35dp"
+        android:layout_height="35dp"
+        android:layout_centerVertical="true"
+        android:layout_alignParentLeft="true"
+        android:layout_marginLeft="5dp"
+        android:background="@drawable/ic_chevron_circle_left_solid"
+        android:visibility="invisible"/>
+    <Button
+        android:id="@+id/rightButton"
+        android:layout_width="35dp"
+        android:layout_height="35dp"
+        android:layout_centerVertical="true"
+        android:layout_alignParentRight="true"
+        android:layout_marginRight="5dp"
+        android:background="@drawable/ic_chevron_circle_right_solid"
+        android:visibility="invisible"/>
+
+    <LinearLayout
+        android:id="@+id/slideMenu"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_alignTop="@id/btnMenu"
+        android:layout_marginTop="35dp"
+        android:layout_marginLeft="5dp"
+        android:background="#ddffffff"
+        android:padding="10dp"
+        android:visibility="invisible">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#000000"
+            android:textSize="8pt"
+            android:paddingLeft="5dp"
+            android:paddingTop="5dp"
+            android:text="Route Transparency"/>
+
+        <SeekBar
+            android:id="@+id/seekTransparency"
+            android:layout_width="250dp"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:min="0"
+            android:progress="33"
+            android:text="Transparency"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="8pt"
+            android:textColor="#000000"
+            android:paddingLeft="5dp"
+            android:paddingTop="5dp"
+            android:text="Route Width"/>
+
+        <SeekBar
+            android:id="@+id/seekWidth"
+            android:layout_width="250dp"
+            android:layout_height="wrap_content"
+            android:max="80"
+            android:min="2"
+            android:progress="10"
+            android:text="Width"/>
+
+        <Switch
+            android:id="@+id/swiZoom"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="8dp"
+            android:layout_alignParentEnd="true"
+            android:textSize="8pt"
+            android:textColor="#000000"
+            android:paddingLeft="5dp"
+            android:text="Auto-Zoom" />
+
+        <Switch
+            android:id="@+id/swiGPS"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="8dp"
+            android:layout_alignParentEnd="true"
+            android:textSize="8pt"
+            android:textColor="#000000"
+            android:paddingLeft="5dp"
+            android:text="Update GPS" />
+
+    </LinearLayout>
+
+
 </RelativeLayout>

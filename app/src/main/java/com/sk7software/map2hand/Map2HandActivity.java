@@ -21,6 +21,7 @@ import android.widget.SimpleAdapter;
 import androidx.core.app.ActivityCompat;
 
 import com.sk7software.map2hand.db.Database;
+import com.sk7software.map2hand.db.PreferencesUtil;
 
 public class Map2HandActivity extends Activity {
 
@@ -59,6 +60,8 @@ public class Map2HandActivity extends Activity {
 		if (savedInstanceState != null) {
 			currentMap = savedInstanceState.getString(STATE_MAP_NAME);
 		}
+
+		initPrefs();
 
 		mapListView = (ListView) findViewById(R.id.mapList);
 		HashMap<String,String> mapMap = new HashMap<String,String>();
@@ -180,6 +183,18 @@ public class Map2HandActivity extends Activity {
 			}
 		}
     }
+
+    private void initPrefs() {
+		PreferencesUtil.init(getApplicationContext());
+		if (!PreferencesUtil.isPrefsSet()) {
+			// Set defaults
+			PreferencesUtil.getInstance().addPreference(PreferencesUtil.PREFERNECE_GPS, true);
+			PreferencesUtil.getInstance().addPreference(PreferencesUtil.PREFERNECE_ZOOM, true);
+			PreferencesUtil.getInstance().addPreference(PreferencesUtil.PREFERNECE_ROUTE_WIDTH, 10);
+			PreferencesUtil.getInstance().addPreference(PreferencesUtil.PREFERNECE_ROUTE_TRANSPARENCY, 30);
+			PreferencesUtil.getInstance().addPreference(PreferencesUtil.PREFERENCES_INIT, PreferencesUtil.PREFS_SET);
+		}
+	}
 
 	public static void verifyStoragePermissions(Activity activity) {
 		// Check if we have write permission

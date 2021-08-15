@@ -19,7 +19,9 @@ public class MapFile {
 	//public static final String MAP_DIR = "/mnt/extSdCard/Android/data/com.sk7software/";
 	//public static final String MAP_DIR = "/Android/data/com.sk7software/";
 	// public static final String MAP_DIR = "/storage/sdcard1/Android/data/com.sk7software/";
+	// EMULATOR
 	//public static final String MAP_DIR = "/data/data/com.sk7software.map2hand/";
+	// P20 Phone
 	public static final String MAP_DIR = "/sdcard/Android/data/com.sk7software.map2hand/";
 
 	private static final String JPG_EXT = ".jpg";
