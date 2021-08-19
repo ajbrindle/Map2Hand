@@ -8,10 +8,10 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.sk7software.map2hand.Ellipsoid;
-import com.sk7software.map2hand.GeoConvert;
-import com.sk7software.map2hand.GeoLocation;
-import com.sk7software.map2hand.Projection;
+import com.sk7software.map2hand.geo.Ellipsoid;
+import com.sk7software.map2hand.geo.GeoConvert;
+import com.sk7software.map2hand.geo.GeoLocation;
+import com.sk7software.map2hand.geo.Projection;
 
 /**
  * @author Andrew
@@ -27,7 +27,7 @@ public class GeoConvertTest {
 	}
 
 	/**
-	 * Test method for {@link com.sk7software.map2hand.GeoConvert#ConvertLLToGrid(com.sk7software.map2hand.Projection, android.location.Location, int)}.
+	 * Test method for {@link GeoConvert#ConvertLLToGrid(Projection, android.location.Location, int)}.
 	 */
 	@Test
 	public final void testConvertLLToGrid() {

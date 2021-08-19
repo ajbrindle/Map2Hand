@@ -12,7 +12,7 @@
     <application
         android:name=".ApplicationContextProvider"
         android:allowBackup="true"
-        android:icon="@drawable/ic_launcher"
+        android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true">
@@ -35,9 +35,17 @@
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value="com.sk7software.map2hand.MapActivity" />
-            </activity>
+        </activity>
         <activity
-            android:name="com.sk7software.map2hand.MapListActivity"
+            android:name="com.sk7software.map2hand.list.MapListActivity"
+            android:label="@string/title_activity_map_list"
+            android:parentActivityName="com.sk7software.map2hand.Map2HandActivity" >
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.sk7software.map2hand.Map2HandActivity" />
+        </activity>
+        <activity
+            android:name="com.sk7software.map2hand.list.RouteListActivity"
             android:label="@string/title_activity_map_list"
             android:parentActivityName="com.sk7software.map2hand.Map2HandActivity" >
             <meta-data

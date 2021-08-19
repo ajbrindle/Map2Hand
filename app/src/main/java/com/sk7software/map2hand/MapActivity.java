@@ -1,11 +1,19 @@
 package com.sk7software.map2hand;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.Writer;
 import java.util.Calendar;
 import java.util.Date;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.PointF;
 import android.location.Location;
 import android.location.LocationListener;
@@ -13,10 +21,29 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.util.Log;
+import android.view.MotionEvent;
+import android.view.View;
 import android.view.Window;
+import android.view.animation.TranslateAnimation;
+import android.widget.Button;
+import android.widget.CompoundButton;
+import android.widget.LinearLayout;
+import android.widget.SeekBar;
+import android.widget.Switch;
 
+import androidx.core.app.ActivityCompat;
+
+import com.davemorrissey.labs.subscaleview.ImageSource;
+import com.google.gson.Gson;
+import com.sk7software.map2hand.db.GPXFile;
+import com.sk7software.map2hand.db.PreferencesUtil;
+import com.sk7software.map2hand.geo.GPXRoute;
+import com.sk7software.map2hand.geo.GeoConvert;
+import com.sk7software.map2hand.geo.GeoLocation;
+import com.sk7software.map2hand.net.NetworkRequest;
+import com.sk7software.map2hand.net.WebRequest;
 import com.sk7software.map2hand.util.SystemUiHider;
-import com.sk7software.scaleview.SubsamplingScaleImageView;
+import com.sk7software.map2hand.view.MapView;
 
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
@@ -27,119 +54,190 @@ import com.sk7software.scaleview.SubsamplingScaleImageView;
 public class MapActivity extends Activity {
 
 	private static final String STATE_SCALE = "state-scale";
-    private static final String STATE_CENTER_X = "state-center-x";
-    private static final String STATE_CENTER_Y = "state-center-y";
-    private static final String STATE_MAP_NAME = "state-map";
-    
-    private static final String TAG = MapActivity.class.getSimpleName();
+	private static final String STATE_CENTER_X = "state-center-x";
+	private static final String STATE_CENTER_Y = "state-center-y";
+	private static final String STATE_MAP_NAME = "state-map";
+	private static final int MAX_SCALE = 50;
 
-    // Time between updates to the location manager (in seconds)
+	private static final String TAG = MapActivity.class.getSimpleName();
+
+	// Time (in seconds) and distance (in metres) between updates to the location manager
 	private static final int LM_UPDATE_INTERVAL = 2;
+	private static final int LM_UPDATE_DISTANCE = 1;
 
 	// Network update intervals
 	private static long lastUpdateTime = 0;
 	private static final long UPDATE_INTERVAL_MS = 300000;
 	private int newfile = 1;  // Indicates whether a new file should be created on the web server
 
-    private LocationManager lm;
-    private LocationListener locationListener;
-	private MapFile currentMap; 
-	protected PowerManager.WakeLock mWakeLock;
-	
-//	private static final Ellipsoid ellip = new Ellipsoid(10, "GRS 1980", 6378137.0, 6356752.31414);
-//	private static final Projection projn = new Projection(1, "UK National Grid", 400000.0, -100000.0, (49.0*Math.PI/180.0), (-2.0*Math.PI/180.0), 0.9996013, e, Projection.SYS_TYPE_TM);
+	private LocationManager lm;
+	private LocationListener locationListener;
+	private MapFile currentMap;
+	private GPXRoute currentRoute;
+	private Button menuButton;
+	private LinearLayout menuPanel;
+	private boolean gpsListen = true;
+	private boolean autoZoom = true;
+	private boolean showBearing = false;
 
-	private SubsamplingScaleImageView imageView = null;
-	private boolean mapLoading = false;
-	private long panEndTime = 0;
-	
-	public static final int TOP_EDGE = 0x01;
-	public static final int LEFT_EDGE = 0x02;
-	public static final int BOTTOM_EDGE = 0x04;
-	public static final int RIGHT_EDGE = 0x08;
-	
-//	/**
-//     * Whether or not the system UI should be auto-hidden after
-//     * {@link #AUTO_HIDE_DELAY_MILLIS} milliseconds.
-//     */
-//    private static final boolean AUTO_HIDE = true;
-//
-//    /**
-//     * If {@link #AUTO_HIDE} is set, the number of milliseconds to wait after
-//     * user interaction before hiding the system UI.
-//     */
-//    private static final int AUTO_HIDE_DELAY_MILLIS = 3000;
-//
-//    /**
-//     * If set, will toggle the system UI visibility upon interaction. Otherwise,
-//     * will show the system UI visibility upon interaction.
-//     */
-//    private static final boolean TOGGLE_ON_CLICK = true;
-//
-//    /**
-//     * The flags to pass to {@link SystemUiHider#getInstance}.
-//     */
-//    private static final int HIDER_FLAGS = SystemUiHider.FLAG_HIDE_NAVIGATION;
-//
-//    /**
-//     * The instance of the {@link SystemUiHider} for this activity.
-//     */
-//    private SystemUiHider mSystemUiHider;
-//
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-    	boolean restoreState = false;
-        Log.d(TAG, "onCreate");
+	private Button upButton;
+	private Button downButton;
+	private Button leftButton;
+	private Button rightButton;
+	private Button zoomInButton;
+	private Button zoomOutButton;
 
-    	super.onCreate(savedInstanceState);
-    	this.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        setContentView(R.layout.activity_map);
+	private MapView mapView = null;
 
-        // Name of map
-        Intent mapIntent = getIntent();
-        String mapName = mapIntent.getStringExtra("map");
-        currentMap = MapController.getMapByName(mapName);
-        //currentMapName = mapName;
+	private enum MapAction {
+		DOWN,
+		UP,
+		LEFT,
+		RIGHT,
+		ZOOM_IN,
+		ZOOM_OUT,
+		CHECK_ONLY
+	}
 
-        // Restore state
-        if (savedInstanceState != null &&
-	        savedInstanceState.containsKey(STATE_SCALE) &&
-	        savedInstanceState.containsKey(STATE_CENTER_X) &&
-	        savedInstanceState.containsKey(STATE_CENTER_Y)) {
-        	
-        	restoreState = true;
-        	currentMap = MapController.getMapByName(savedInstanceState.getString(STATE_MAP_NAME));
-        }
-        
-        mapLoading = true;
-        loadNewMap(currentMap, restoreState);
-    	
-        if (restoreState) {
-	    	imageView.setScaleAndCenter(savedInstanceState.getFloat(STATE_SCALE), 
+	@Override
+	protected void onCreate(Bundle savedInstanceState) {
+		boolean restoreState = false;
+		Log.d(TAG, "onCreate");
+
+		super.onCreate(savedInstanceState);
+		this.requestWindowFeature(Window.FEATURE_NO_TITLE);
+		setContentView(R.layout.activity_map);
+
+		// Name of map
+		Intent mapIntent = getIntent();
+		String mapName = mapIntent.getStringExtra("map");
+		currentMap = MapController.getMapByName(mapName);
+
+		menuPanel = (LinearLayout)findViewById(R.id.slideMenu);
+		menuButton = (Button)findViewById(R.id.btnMenu);
+		menuButton.setOnClickListener(new View.OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				if (menuPanel.getVisibility() == View.INVISIBLE) {
+					initialisePanel();
+					TranslateAnimation animate = new TranslateAnimation(
+							-menuPanel.getWidth(),
+							0,
+							0,
+							0);
+					animate.setDuration(250);
+					menuPanel.startAnimation(animate);
+					menuPanel.setVisibility(View.VISIBLE);
+				} else {
+					TranslateAnimation animate = new TranslateAnimation(
+							0,
+							-menuPanel.getWidth(),
+							0,
+							0);
+					animate.setDuration(250);
+					menuPanel.startAnimation(animate);
+					menuPanel.setVisibility(View.INVISIBLE);
+				}
+			}
+		});
+
+		// Restore state
+		if (savedInstanceState != null &&
+				savedInstanceState.containsKey(STATE_SCALE) &&
+				savedInstanceState.containsKey(STATE_CENTER_X) &&
+				savedInstanceState.containsKey(STATE_CENTER_Y)) {
+
+			restoreState = true;
+			currentMap = MapController.getMapByName(savedInstanceState.getString(STATE_MAP_NAME));
+		}
+
+		// Initialise map view
+		mapView = (MapView) findViewById(R.id.mapView);
+		mapView.setMaxScale(MAX_SCALE);
+		mapView.setOnReadyFunction(new MapView.OnReadyCallback() {
+			@Override
+			public void ready() {
+				Log.d(TAG, "OnReady callback");
+				checkEdges(MapAction.CHECK_ONLY);
+			}
+		});
+		refreshDisplay(null, currentMap, false, false);
+
+		String routeName = mapIntent.getStringExtra("route");
+		String routeLocal = mapIntent.getStringExtra("local");
+		Log.d(TAG, "Local data: " + routeLocal);
+		setCurrentRoute(routeName, "true".equals(routeLocal));
+
+		if (restoreState) {
+			mapView.setScaleAndCenter(savedInstanceState.getFloat(STATE_SCALE),
 					new PointF(savedInstanceState.getFloat(STATE_CENTER_X), savedInstanceState.getFloat(STATE_CENTER_Y)));
-        }
-    }
+		}
 
-    @Override
-    protected void onStart() {
-    	super.onStart();
-    }
-    
-    @Override
-    protected void onResume() {        
-        Log.d(TAG, "onResume");
-    	super.onResume();
-    	
-        // Start location listener
-        lm = (LocationManager)getSystemService(LOCATION_SERVICE);    
-            
-            locationListener = new MapLocationListener();
-            
-            lm.requestLocationUpdates(
-                LocationManager.GPS_PROVIDER, 
-                LM_UPDATE_INTERVAL * 1000, 
-                0, 
-                locationListener);        
+		initialisePanel();
+
+		upButton = (Button)findViewById(R.id.upButton);
+		setChangeMapAction(upButton, MapAction.UP);
+		downButton = (Button)findViewById(R.id.downButton);
+		setChangeMapAction(downButton, MapAction.DOWN);
+		leftButton = (Button)findViewById(R.id.leftButton);
+		setChangeMapAction(leftButton, MapAction.LEFT);
+		rightButton = (Button)findViewById(R.id.rightButton);
+		setChangeMapAction(rightButton, MapAction.RIGHT);
+		zoomInButton = (Button)findViewById(R.id.zoomInButton);
+		setChangeMapAction(zoomInButton, MapAction.ZOOM_IN);
+		zoomOutButton = (Button)findViewById(R.id.zoomOutButton);
+		setChangeMapAction(zoomOutButton, MapAction.ZOOM_OUT);
+	}
+
+	private void setChangeMapAction(final Button button, final MapAction action) {
+		button.setOnClickListener(new View.OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				checkEdges(action);
+			}
+		});
+	}
+
+	@Override
+	protected void onStart() {
+		super.onStart();
+	}
+
+	@Override
+	protected void onResume() {
+		Log.d(TAG, "onResume");
+		super.onResume();
+
+		// Start location listener
+		lm = (LocationManager) getSystemService(LOCATION_SERVICE);
+
+		locationListener = new MapLocationListener();
+
+		if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+			// TODO: Consider calling
+			//    ActivityCompat#requestPermissions
+			// here to request the missing permissions, and then overriding
+			//   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+			//                                          int[] grantResults)
+			// to handle the case where the user grants the permission. See the documentation
+			// for ActivityCompat#requestPermissions for more details.
+			return;
+		}
+		lm.requestLocationUpdates(
+				LocationManager.GPS_PROVIDER,
+				LM_UPDATE_INTERVAL * 1000,
+				LM_UPDATE_DISTANCE,
+				locationListener);
+
+		mapView.setOnTouchListener(new View.OnTouchListener() {
+			@Override
+			public boolean onTouch(View v, MotionEvent event) {
+				if (event.getAction() == MotionEvent.ACTION_MOVE) {
+					checkEdges(MapAction.CHECK_ONLY);
+				}
+				return false;
+			}
+		});
     }
 
     @Override
@@ -169,15 +267,197 @@ public class MapActivity extends Activity {
         super.onSaveInstanceState(outState);
         Log.d(TAG, "onSaveInstanceState");
 
-        //SubsamplingScaleImageView imageView = (SubsamplingScaleImageView)findViewById(R.id.imageView);
-        outState.putFloat(STATE_SCALE, imageView.getScale());
+        outState.putFloat(STATE_SCALE, mapView.getScale());
         outState.putString(STATE_MAP_NAME, currentMap.getName());
-        PointF center = imageView.getCenter();
+        PointF center = mapView.getCenter();
         if (center != null) {
             outState.putFloat(STATE_CENTER_X, center.x);
             outState.putFloat(STATE_CENTER_Y, center.y);
         }
     }
+
+    private void setCurrentRoute(String routeName, boolean isLocal) {
+		if (routeName == null || "".equals(routeName)) {
+			return;
+		}
+
+		if (isLocal) {
+			Log.d(TAG, "Route is local: " + routeName);
+			currentRoute = GPXRoute.readFromFile(new File(MapFile.MAP_DIR + routeName));
+			currentRoute.calcXY(currentMap, 0);
+			mapView.setRoute(currentRoute);
+		} else {
+			// Fetch route and store locally
+			NetworkRequest.fetchGPX(ApplicationContextProvider.getContext(), routeName, new NetworkRequest.NetworkCallback() {
+				@Override
+				public void onRequestCompleted(Object callbackData) {
+					currentRoute = (GPXRoute)callbackData;
+					if (currentRoute != null) {
+						currentRoute.calcEN(currentMap, 0);
+						currentRoute.calcXY(currentMap, 0);
+						mapView.setRoute(currentRoute);
+						GPXRoute.writeToFile(currentRoute, routeName);
+					}
+				}
+
+				@Override
+				public void onError(Exception e) {
+					Log.d(TAG, "Error fetching route points: " + e.getMessage());
+				}
+			});
+		}
+	}
+
+	private void initialisePanel() {
+		SeekBar seekTransparency = (SeekBar)findViewById(R.id.seekTransparency);
+		seekTransparency.setProgress(PreferencesUtil.getInstance().getIntPreference(PreferencesUtil.PREFERNECE_ROUTE_TRANSPARENCY));
+		seekTransparency.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+			int progressChangedValue = 0;
+
+			public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+				PreferencesUtil.getInstance().addPreference(PreferencesUtil.PREFERNECE_ROUTE_TRANSPARENCY, progress);
+				mapView.invalidate();
+			}
+			public void onStartTrackingTouch(SeekBar seekBar) {
+			}
+
+			public void onStopTrackingTouch(SeekBar seekBar) {
+			}
+		});
+
+		SeekBar seekWidth = (SeekBar)findViewById(R.id.seekWidth);
+		seekWidth.setProgress(PreferencesUtil.getInstance().getIntPreference(PreferencesUtil.PREFERNECE_ROUTE_WIDTH));
+		seekWidth.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+			int progressChangedValue = 0;
+
+			public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+				PreferencesUtil.getInstance().addPreference(PreferencesUtil.PREFERNECE_ROUTE_WIDTH, progress);
+				mapView.invalidate();
+			}
+			public void onStartTrackingTouch(SeekBar seekBar) {
+			}
+
+			public void onStopTrackingTouch(SeekBar seekBar) {
+			}
+		});
+
+		SeekBar seekMarker = (SeekBar)findViewById(R.id.seekMarker);
+		seekMarker.setProgress(PreferencesUtil.getInstance().getIntPreference(PreferencesUtil.PREFERNECE_MARKER_SIZE));
+		seekMarker.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+			int progressChangedValue = 0;
+
+			public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+				PreferencesUtil.getInstance().addPreference(PreferencesUtil.PREFERNECE_MARKER_SIZE, progress);
+				mapView.invalidate();
+			}
+			public void onStartTrackingTouch(SeekBar seekBar) {
+			}
+
+			public void onStopTrackingTouch(SeekBar seekBar) {
+			}
+		});
+
+		Switch swiGPS = (Switch)findViewById(R.id.swiGPS);
+		gpsListen = PreferencesUtil.getInstance().getBooleanPreference(PreferencesUtil.PREFERNECE_GPS);
+		swiGPS.setChecked(gpsListen);
+		swiGPS.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+			public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+				PreferencesUtil.getInstance().addPreference(PreferencesUtil.PREFERNECE_GPS, isChecked);
+				gpsListen = isChecked;
+			}
+		});
+
+		Switch swiZoom = (Switch)findViewById(R.id.swiZoom);
+		autoZoom = PreferencesUtil.getInstance().getBooleanPreference(PreferencesUtil.PREFERNECE_ZOOM);
+		swiZoom.setChecked(autoZoom);
+		swiZoom.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+			public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+				PreferencesUtil.getInstance().addPreference(PreferencesUtil.PREFERNECE_ZOOM, isChecked);
+				autoZoom = isChecked;
+			}
+		});
+
+		Switch swiBearing = (Switch)findViewById(R.id.swiBearing);
+		showBearing = PreferencesUtil.getInstance().getBooleanPreference(PreferencesUtil.PREFERNECE_BEARING);
+		swiBearing.setChecked(showBearing);
+		swiBearing.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+			public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+				PreferencesUtil.getInstance().addPreference(PreferencesUtil.PREFERNECE_BEARING, isChecked);
+				showBearing = isChecked;
+			}
+		});
+	}
+
+	private void checkEdges(MapAction action) {
+		PointF viewTopLeft = mapView.viewToSourceCoord(0, 0);
+		PointF viewBottomRight = mapView.viewToSourceCoord(mapView.getWidth(), mapView.getHeight());
+
+		if (viewTopLeft != null && viewBottomRight != null) {
+			// Get grid coordinates at edges of display
+			float leftE = currentMap.getTopLeftE() + (float) (viewTopLeft.x * currentMap.getResolution());
+			float rightE = currentMap.getTopLeftE() + (float) (viewBottomRight.x * currentMap.getResolution());
+			float midE = (rightE + leftE) / 2;
+			float topN = currentMap.getTopLeftN() - (float) (viewTopLeft.y * currentMap.getResolution());
+			float bottomN = currentMap.getTopLeftN() - (float) (viewBottomRight.y * currentMap.getResolution());
+			float midN = (topN + bottomN) / 2;
+			float offset = 5 * (float) currentMap.getResolution();
+
+			GeoLocation checkUp = new GeoLocation(midE, topN + offset);
+			GeoLocation checkDown = new GeoLocation(midE, bottomN - offset);
+			GeoLocation checkLeft = new GeoLocation(leftE - offset, midN);
+			GeoLocation checkRight = new GeoLocation(rightE + offset, midN);
+			GeoLocation checkZoom = new GeoLocation(midE, midN);
+
+//		Log.d(TAG, "Up: " + checkUp.x + "," + checkUp.y);
+//		Log.d(TAG, "Down: " + checkDown.x + "," + checkDown.y);
+//		Log.d(TAG, "Left: " + checkLeft.x + "," + checkLeft.y);
+//		Log.d(TAG, "Right: " + checkRight.x + "," + checkRight.y);
+			if (!checkAndDoAction(MapAction.UP, checkUp, upButton, action))
+				if (!checkAndDoAction(MapAction.DOWN, checkDown, downButton, action))
+					if (!checkAndDoAction(MapAction.LEFT, checkLeft, leftButton, action))
+						if (!checkAndDoAction(MapAction.RIGHT, checkRight, rightButton, action))
+							if (!checkAndDoAction(MapAction.ZOOM_IN, checkZoom, zoomInButton, action))
+								checkAndDoAction(MapAction.ZOOM_OUT, checkZoom, zoomOutButton, action);
+		}
+	}
+
+	// buttonAction is the action associated with the button to display
+	// action is the actual action being requested (could be CHECK_ONLY, in which case only button visibility is affected)
+	private boolean checkAndDoAction(MapAction buttonAction, GeoLocation geoLoc, Button button, MapAction action) {
+		MapFile map = null;
+		boolean keepScale = true;
+		boolean zooming = (buttonAction == MapAction.ZOOM_IN || buttonAction == MapAction.ZOOM_OUT);
+		PointF point = new PointF((float)geoLoc.getEasting(), (float)geoLoc.getNorthing());
+
+		if (!MapController.isPointOnMap(point, currentMap)) {
+			map = MapController.hasMap(point, currentMap);
+		} else if (zooming) {
+			map = MapController.getNearestMap(point, currentMap, buttonAction == MapAction.ZOOM_IN);
+			keepScale = false;
+		} else {
+			button.setVisibility(View.INVISIBLE);
+			return false;
+		}
+
+		if (map != null) {
+			button.setVisibility(View.VISIBLE);
+
+			// Perform action if the requested action matches the button action
+			if (buttonAction == action) {
+				// Disable auto-zoom if zooming
+				if (zooming) {
+					autoZoom = false;
+					PreferencesUtil.getInstance().addPreference(PreferencesUtil.PREFERNECE_ZOOM, false);
+				}
+				refreshDisplay(geoLoc, map, keepScale, false);
+				return true;
+			}
+		} else {
+			button.setVisibility(View.INVISIBLE);
+		}
+
+		return false;
+	}
 
 	/************************************************************
 	 * MyLocationListener nested class
@@ -188,54 +468,46 @@ public class MapActivity extends Activity {
     {
         //@Override
         public synchronized void onLocationChanged(Location loc) {
-            if (loc != null && !mapLoading && !isPanning()) {
+            if (loc != null && mapView.isReady() && gpsListen) {
             	// Check lat and lon are > 0
             	if (Math.abs(loc.getLatitude()) > 0.001 && Math.abs(loc.getLongitude()) > 0.001) {
             		
 	        		try {
-	        			boolean newMapLoaded = false;	        			
+	        			boolean mapChanged = false;
 		                Log.d(TAG, "Location changed : Lat: " + loc.getLatitude() + 
 			                    " Lng: " + loc.getLongitude());
 		                
 		                GeoLocation geoLoc = new GeoLocation();
 		                geoLoc.setLatitude(loc.getLatitude());
 		                geoLoc.setLongitude(loc.getLongitude());
-		                geoLoc = GeoConvert.ConvertLLToGrid(currentMap.getProjection(), geoLoc, 0);
-		                
+						geoLoc.setENFromLatLong(currentMap, 0);
+		                if (loc.hasBearing()) {
+							geoLoc.setBearing(loc.getBearing());
+						} else {
+		                	geoLoc.setBearing(-999);
+						}
+
 		                // Check for better map
-		                MapFile newMap = MapController.getBestMap(geoLoc);
-		                if (newMap != null && !newMap.equals(currentMap)) {
-		                	mapLoading = true;
-		                	Log.d(TAG, "Loading map: " + newMap.getName());
-		                	currentMap = newMap;
-		                	loadNewMap(newMap, false);
-		                	newMapLoaded = true;
-		                }
-		                
-		                // Show location on map
-		                PointF mapPoint = new PointF();
-		                mapPoint.x = (float)((geoLoc.getEasting() - currentMap.getTopLeftE())/currentMap.getResolution());
-		                mapPoint.y = (float)((currentMap.getTopLeftN() - geoLoc.getNorthing())/currentMap.getResolution());
-		                Log.d(TAG, "Map point: " + mapPoint.x + "," + mapPoint.y);
-	            		imageView.setGeoLocation(mapPoint);
-		                if (imageView != null) {
-		                	if (newMapLoaded) {
-		                		Log.d(TAG, "Rescaling new map");
-		                		imageView.setScaleAndCenter(1.0F, mapPoint);	
-		                	}
-		                	
-		                	uploadPosition(loc);
-		                }
+						MapFile newMap = MapController.getBestMap(geoLoc, currentMap, autoZoom);
+						if (newMap != null && !newMap.equals(currentMap)) {
+							Log.d(TAG, "Map changed to: " + newMap.getName());
+							boolean resChanged = MapController.isDifferentResolution(currentMap.getResolution(), newMap.getResolution());
+							refreshDisplay(geoLoc, newMap, !resChanged, true);
+						} else if (Calendar.getInstance().getTimeInMillis() > mapView.getPanDelay()) {
+							// Show location on map
+							refreshDisplay(geoLoc, null, true, true);
+							uploadPosition(loc);
+						}
+						checkEdges(MapAction.CHECK_ONLY);
 	        		}
-	        		
-	        		
+
 		        	catch (Exception e) {
 		        		Log.d(TAG, "Exception: " + e.getMessage());
 		        	}
 	            }
             }
         }
-        
+
         private final void uploadPosition(Location loc) {
         	Date now = new Date();
         	if (now.getTime() - lastUpdateTime > UPDATE_INTERVAL_MS) {
@@ -253,63 +525,71 @@ public class MapActivity extends Activity {
 	            lastUpdateTime = now.getTime();
         	}
         }
-
-        
-        //@Override
-        public void onProviderDisabled(String provider) {
-            // TODO Auto-generated method stub
-        }
-
-        //@Override
-        public void onProviderEnabled(String provider) {
-            // TODO Auto-generated method stub
-        }
-
-        //@Override
-        public void onStatusChanged(String provider, int status, 
-            Bundle extras) {
-            // TODO Auto-generated method stub
-            Log.d(TAG, "onStatusChanged");
-        }
-    }        
-
-    public void loadNewMap(MapFile map, boolean restoreState) {
-        try {
-	        imageView = (SubsamplingScaleImageView)findViewById(R.id.imageView);
-	        imageView.setMap(this);
-	        imageView.setImageFile(map.getFullPath());
-	        
-	        if (!restoreState) {
-	        	imageView.setScaleAndCenter(1.0F, new PointF(map.getWidthPix()/2, map.getHeightPix()/2));
-	        }
-        } catch (IOException e) {
-        	Log.d(MapActivity.class.getSimpleName(), "Could not load map", e);
-        }       	
     }
+
+    // Scenarios for refreshing display
+	// 1 - location changed, no change of map
+	//		centre = E/N
+	//		newMap = null
+	//		keepScale = true
+	//		locIsGPS = true
+	// 2 - location changed, change of map
+	//		centre = E/N
+	//		newMap = new map to load
+	//		keepScale = true if same res as old map, otherwise false
+	//		locIsGPS = true
+	// 3 - manual switch to adjacent map
+	//		centre = edge point on adjacent map
+	//		newMap = adjacent map
+	//		keepScale = true
+	//		locIsGPS = false
+	// 4 - zooming to new map
+	//		centre = centre of current map
+	//		newMap = new map to zoom to
+	//		keepScale = false
+	//		locIsGPS = false
+    private void refreshDisplay(GeoLocation centre, MapFile newMap, boolean keepScale, boolean locIsGPS) {
+//    	Log.d(TAG, "New map: " + (newMap != null ? newMap.getName() : "null"));
+//    	Log.d(TAG, "Point: " + (centre != null ? centre.x + "," + centre.y : "null"));
+//    	Log.d(TAG, "Keep scale: " + keepScale);
+//    	Log.d(TAG, "Location is GPS: " + locIsGPS);
+
+    	float currentScale = mapView.getScale();
+
+		if (newMap != null) {
+    		mapView.setImage(ImageSource.uri(newMap.getFullPath()));
+    		currentMap = newMap;
+    		if (currentRoute != null) {
+				currentRoute.calcXY(currentMap, 0);
+			}
+		}
+
+		PointF mapPoint = new PointF();
+		if (centre == null) {
+			mapPoint.x = currentMap.getWidthPix()/2;
+			mapPoint.y = currentMap.getHeightPix()/2;
+		} else {
+			mapPoint.x = (float) ((centre.getEasting() - currentMap.getTopLeftE()) / currentMap.getResolution());
+			mapPoint.y = (float) ((currentMap.getTopLeftN() - centre.getNorthing()) / currentMap.getResolution());
+			Log.d(TAG, "Map point: " + mapPoint.x + "," + mapPoint.y);
+			if (locIsGPS) {
+				GeoLocation mapGeoLoc = new GeoLocation(mapPoint.x, mapPoint.y);
+				mapGeoLoc.setBearing(centre.getBearing());
+				mapView.setMapGPSLocation(mapGeoLoc);
+			}
+		}
+
+		if (keepScale) {
+			mapView.setScaleAndCenter(currentScale, mapPoint);
+		} else {
+			mapView.setScaleAndCenter(1.0F, mapPoint);
+		}
+		mapView.invalidate();
+	}
 
     public void clearUpdating() {
-    	mapLoading = false;
-    }
-    
-    public void setMapPanning(boolean pan, boolean endNow) {
-		if (endNow) {
-			panEndTime = 0;
-		} else {
-    		panEndTime = Calendar.getInstance().getTimeInMillis() + 5000;
-		}
     }
 
-    private boolean isPanning() {
-    	Log.d(TAG, "Check is panning: " + panEndTime);
-    	if (panEndTime == 0) return false;
-		if (Calendar.getInstance().getTimeInMillis() > panEndTime) {
-    		panEndTime = 0;
-    		return false;
-		} else {
-			return true;
-		}    	
-    }
-    
     @Override
     protected void onStop() {
         Log.d(TAG, "onStop");
@@ -322,47 +602,3 @@ public class MapActivity extends Activity {
         super.onDestroy();
     }
 }
-
-//@Override
-//protected void onPostCreate(Bundle savedInstanceState) {
-//  super.onPostCreate(savedInstanceState);
-//
-//  // Trigger the initial hide() shortly after the activity has been
-//  // created, to briefly hint to the user that UI controls
-//  // are available.
-////  delayedHide(100);
-//}
-//
-//
-///**
-//* Touch listener to use for in-layout UI controls to delay hiding the
-//* system UI. This is to prevent the jarring behavior of controls going away
-//* while interacting with activity UI.
-//*/
-////View.OnTouchListener mDelayHideTouchListener = new View.OnTouchListener() {
-////  @Override
-////  public boolean onTouch(View view, MotionEvent motionEvent) {
-////      if (AUTO_HIDE) {
-////          delayedHide(AUTO_HIDE_DELAY_MILLIS);
-////      }
-////      return false;
-////  }
-////};
-//
-////Handler mHideHandler = new Handler();
-////Runnable mHideRunnable = new Runnable() {
-////  @Override
-////  public void run() {
-////      mSystemUiHider.hide();
-////  }
-////};
-////
-///**
-//* Schedules a call to hide() in [delay] milliseconds, canceling any
-//* previously scheduled calls.
-//*/
-////private void delayedHide(int delayMillis) {
-////  mHideHandler.removeCallbacks(mHideRunnable);
-////  mHideHandler.postDelayed(mHideRunnable, delayMillis);
-////}
-//
