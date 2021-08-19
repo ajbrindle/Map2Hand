@@ -6,6 +6,7 @@ import android.util.Log;
 import com.google.gson.Gson;
 import com.sk7software.map2hand.MapFile;
 import com.sk7software.map2hand.db.GPXFile;
+import com.sk7software.map2hand.db.GPXFiles;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -50,22 +51,24 @@ public class GPXRoute implements Serializable {
     }
 
     public void calcEN(MapFile map, int zone) {
-
+        for (GPXLocation pt : getPoints()) {
+            GeoLocation geoLoc = new GeoLocation();
+            geoLoc.setLatitude(pt.getLat());
+            geoLoc.setLongitude(pt.getLon());
+            geoLoc = GeoConvert.ConvertLLToGrid(map.getProjection(), geoLoc, 0);
+            pt.setEasting(geoLoc.getEasting());
+            pt.setNorthing(geoLoc.getNorthing());
+        }
     }
 
     public void calcXY(MapFile map, int zone) {
         mapPoints = new ArrayList<>();
 
-        for (GPXLocation ll : getPoints()) {
-            GeoLocation geoLoc = new GeoLocation();
-            geoLoc.setLatitude(ll.getLat());
-            geoLoc.setLongitude(ll.getLon());
-            geoLoc = GeoConvert.ConvertLLToGrid(map.getProjection(), geoLoc, 0);
-
+        for (GPXLocation pt : getPoints()) {
             // Calculate map x, y
             PointF mapPoint = new PointF();
-            mapPoint.x = (float) ((geoLoc.getEasting() - map.getTopLeftE()) / map.getResolution());
-            mapPoint.y = (float) ((map.getTopLeftN() - geoLoc.getNorthing()) / map.getResolution());
+            mapPoint.x = (float) ((pt.getEasting() - map.getTopLeftE()) / map.getResolution());
+            mapPoint.y = (float) ((map.getTopLeftN() - pt.getNorthing()) / map.getResolution());
             mapPoints.add(mapPoint);
         }
     }
@@ -82,13 +85,12 @@ public class GPXRoute implements Serializable {
 
     public static void writeToFile(GPXRoute route, String fileName) {
         Gson gson = new Gson();
-        File gpxFile = new File(MapFile.MAP_DIR + fileName);
-        try (Writer output = new BufferedWriter(new FileWriter(gpxFile))) {
+        File mhrFile = new File(MapFile.MAP_DIR + fileName.replace(".gpx", GPXFiles.ROUTE_EXT));
+        try (Writer output = new BufferedWriter(new FileWriter(mhrFile))) {
             output.write(gson.toJson(route));
-            Log.d(TAG, "Wrote local file: " + gpxFile.getName());
+            Log.d(TAG, "Wrote local file: " + mhrFile.getName());
         } catch (IOException e) {
             Log.d(TAG, "Error storing route file: " + e.getMessage());
         }
-
     }
 }

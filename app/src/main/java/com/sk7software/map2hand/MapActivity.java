@@ -57,11 +57,13 @@ public class MapActivity extends Activity {
 	private static final String STATE_CENTER_X = "state-center-x";
 	private static final String STATE_CENTER_Y = "state-center-y";
 	private static final String STATE_MAP_NAME = "state-map";
+	private static final int MAX_SCALE = 50;
 
 	private static final String TAG = MapActivity.class.getSimpleName();
 
-	// Time between updates to the location manager (in seconds)
+	// Time (in seconds) and distance (in metres) between updates to the location manager
 	private static final int LM_UPDATE_INTERVAL = 2;
+	private static final int LM_UPDATE_DISTANCE = 1;
 
 	// Network update intervals
 	private static long lastUpdateTime = 0;
@@ -151,7 +153,7 @@ public class MapActivity extends Activity {
 
 		// Initialise map view
 		mapView = (MapView) findViewById(R.id.mapView);
-		mapView.setMaxScale(50);
+		mapView.setMaxScale(MAX_SCALE);
 		mapView.setOnReadyFunction(new MapView.OnReadyCallback() {
 			@Override
 			public void ready() {
@@ -224,7 +226,7 @@ public class MapActivity extends Activity {
 		lm.requestLocationUpdates(
 				LocationManager.GPS_PROVIDER,
 				LM_UPDATE_INTERVAL * 1000,
-				1,
+				LM_UPDATE_DISTANCE,
 				locationListener);
 
 		mapView.setOnTouchListener(new View.OnTouchListener() {
@@ -291,6 +293,7 @@ public class MapActivity extends Activity {
 				public void onRequestCompleted(Object callbackData) {
 					currentRoute = (GPXRoute)callbackData;
 					if (currentRoute != null) {
+						currentRoute.calcEN(currentMap, 0);
 						currentRoute.calcXY(currentMap, 0);
 						mapView.setRoute(currentRoute);
 						GPXRoute.writeToFile(currentRoute, routeName);
@@ -298,7 +301,9 @@ public class MapActivity extends Activity {
 				}
 
 				@Override
-				public void onError(Exception e) { }
+				public void onError(Exception e) {
+					Log.d(TAG, "Error fetching route points: " + e.getMessage());
+				}
 			});
 		}
 	}
@@ -384,7 +389,6 @@ public class MapActivity extends Activity {
 	}
 
 	private void checkEdges(MapAction action) {
-//		Log.d(TAG, "Check edges: " + action.name());
 		PointF viewTopLeft = mapView.viewToSourceCoord(0, 0);
 		PointF viewBottomRight = mapView.viewToSourceCoord(mapView.getWidth(), mapView.getHeight());
 
@@ -417,6 +421,8 @@ public class MapActivity extends Activity {
 		}
 	}
 
+	// buttonAction is the action associated with the button to display
+	// action is the actual action being requested (could be CHECK_ONLY, in which case only button visibility is affected)
 	private boolean checkAndDoAction(MapAction buttonAction, GeoLocation geoLoc, Button button, MapAction action) {
 		MapFile map = null;
 		boolean keepScale = true;
@@ -426,7 +432,6 @@ public class MapActivity extends Activity {
 		if (!MapController.isPointOnMap(point, currentMap)) {
 			map = MapController.hasMap(point, currentMap);
 		} else if (zooming) {
-//			Log.d(TAG, "Check zoom " + buttonAction.name());
 			map = MapController.getNearestMap(point, currentMap, buttonAction == MapAction.ZOOM_IN);
 			keepScale = false;
 		} else {
@@ -436,6 +441,8 @@ public class MapActivity extends Activity {
 
 		if (map != null) {
 			button.setVisibility(View.VISIBLE);
+
+			// Perform action if the requested action matches the button action
 			if (buttonAction == action) {
 				// Disable auto-zoom if zooming
 				if (zooming) {
@@ -473,7 +480,7 @@ public class MapActivity extends Activity {
 		                GeoLocation geoLoc = new GeoLocation();
 		                geoLoc.setLatitude(loc.getLatitude());
 		                geoLoc.setLongitude(loc.getLongitude());
-		                geoLoc = GeoConvert.ConvertLLToGrid(currentMap.getProjection(), geoLoc, 0);
+						geoLoc.setENFromLatLong(currentMap, 0);
 		                if (loc.hasBearing()) {
 							geoLoc.setBearing(loc.getBearing());
 						} else {

@@ -5,8 +5,6 @@ import java.util.HashMap;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.AlertDialog;
-import android.app.Dialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
@@ -24,6 +22,8 @@ import androidx.core.app.ActivityCompat;
 
 import com.sk7software.map2hand.db.Database;
 import com.sk7software.map2hand.db.PreferencesUtil;
+import com.sk7software.map2hand.list.MapListActivity;
+import com.sk7software.map2hand.list.RouteListActivity;
 
 public class Map2HandActivity extends Activity {
 

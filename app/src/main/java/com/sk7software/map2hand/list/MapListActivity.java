@@ -1,4 +1,4 @@
-package com.sk7software.map2hand;
+package com.sk7software.map2hand.list;
 
 import android.app.Activity;
 import android.content.Intent;
@@ -11,6 +11,7 @@ import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.AdapterView.OnItemClickListener;
 
+import com.sk7software.map2hand.R;
 import com.sk7software.map2hand.db.Database;
 
 public class MapListActivity extends Activity {

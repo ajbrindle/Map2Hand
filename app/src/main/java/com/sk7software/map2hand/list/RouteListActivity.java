@@ -1,41 +1,26 @@
-package com.sk7software.map2hand;
+package com.sk7software.map2hand.list;
 
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.Intent;
-import android.graphics.BitmapFactory;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.Menu;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 
-import com.google.gson.Gson;
-import com.sk7software.map2hand.db.Database;
+import com.sk7software.map2hand.ActivityUpdateInterface;
+import com.sk7software.map2hand.ApplicationContextProvider;
+import com.sk7software.map2hand.R;
 import com.sk7software.map2hand.db.GPXFile;
 import com.sk7software.map2hand.db.GPXFiles;
-import com.sk7software.map2hand.geo.GPXRoute;
 import com.sk7software.map2hand.net.NetworkRequest;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Collectors;
 
 public class RouteListActivity extends Activity implements ActivityUpdateInterface {
     private AlertDialog.Builder progressDialogBuilder;
     private Dialog progressDialog;
-
-    private static final String ROUTE_EXT = ".gpx";
-    private static final String TAG = RouteListActivity.class.getSimpleName();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -68,7 +53,7 @@ public class RouteListActivity extends Activity implements ActivityUpdateInterfa
     private void initGPXFileList(final Activity activity) {
         setProgress(true, "Fetching Routes");
         final GPXFiles files = new GPXFiles();
-        files.addFiles(getLocalFiles());
+        files.addLocalFiles();
 
         NetworkRequest.fetchGPXFiles(ApplicationContextProvider.getContext(), this, new NetworkRequest.NetworkCallback() {
             @Override
@@ -116,30 +101,5 @@ public class RouteListActivity extends Activity implements ActivityUpdateInterfa
                 progressDialog.dismiss();
             }
         }
-    }
-
-    private static GPXFiles getLocalFiles() {
-        // Get all files in MAP_DIR with .mhr extension
-        File directory = new File(MapFile.MAP_DIR);
-        Gson gson = new Gson();
-        GPXFiles gpxFiles = new GPXFiles();
-
-        List<File> files = Arrays.asList(directory.listFiles()).stream()
-                                .filter(file -> file.getName().endsWith(ROUTE_EXT)).collect(Collectors.toList());
-
-        for (File f : files) {
-            // Load the file
-            Log.d(TAG, "Found local route: " + f.getAbsolutePath());
-            GPXRoute route = GPXRoute.readFromFile(f);
-
-            if (route != null) {
-                GPXFile file = new GPXFile();
-                file.setName(f.getName());
-                file.setDescription(route.getName());
-                file.setLocal(true);
-                gpxFiles.addFile(file);
-            }
-        }
-        return gpxFiles;
     }
 }

@@ -28,6 +28,9 @@ public class GPXFileTest {
 
         f2s.setDescription("F2 desc");
         assertTrue(f2.equals(f2s));
+
+        f2.setName("F2.mhr");
+        assertTrue(f2.equals(f2s));
     }
 
     @Test
@@ -48,5 +51,9 @@ public class GPXFileTest {
 
         f2s.setDescription("F2 desc");
         assertFalse(files.getFiles().contains(f2s));
+
+        GPXFile f1s = new GPXFile();
+        f1s.setName("F1.mhr");
+        assertTrue(files.getFiles().contains(f1s));
     }
 }

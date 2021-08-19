@@ -50,7 +50,11 @@ public class GPXFile {
         }
 
         GPXFile f = (GPXFile)obj;
-        if (name.equals(f.getName())) {
+
+        // Strip off file extensions from name
+        String thisName = stripExt(name);
+        String thatName = stripExt(f.getName());
+        if (thisName.equals(thatName)) {
             if (description != null) {
                 return (description.equals(f.getDescription()));
             } else {
@@ -67,6 +71,15 @@ public class GPXFile {
             return name.hashCode();
         } else {
             return (name + description).hashCode();
+        }
+    }
+
+    private String stripExt(String filename) {
+        int extPos = filename.lastIndexOf(".");
+        if (extPos < 0) {
+            return filename;
+        } else {
+            return filename.substring(0, extPos);
         }
     }
 }

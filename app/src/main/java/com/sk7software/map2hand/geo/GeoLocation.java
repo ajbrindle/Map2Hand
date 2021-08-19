@@ -1,5 +1,7 @@
 package com.sk7software.map2hand.geo;
 
+import com.sk7software.map2hand.MapFile;
+
 public class GeoLocation {
 
 	private double latitude;
@@ -59,4 +61,10 @@ public class GeoLocation {
 	public double getBearing() { return bearing; }
 
 	public void setBearing(double bearing) { this.bearing = bearing; }
+
+	public void setENFromLatLong(MapFile map, int zone) {
+		GeoLocation gridLoc = GeoConvert.ConvertLLToGrid(map.getProjection(), this, zone);
+		setEasting(gridLoc.getEasting());
+		setNorthing(gridLoc.getNorthing());
+	}
 }
