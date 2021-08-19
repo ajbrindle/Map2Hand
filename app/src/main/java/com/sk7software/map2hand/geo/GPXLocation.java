@@ -1,6 +1,8 @@
 package com.sk7software.map2hand.geo;
 
-public class GPXLocation {
+import java.io.Serializable;
+
+public class GPXLocation implements Serializable {
     private double lat;
     private double lon;
 

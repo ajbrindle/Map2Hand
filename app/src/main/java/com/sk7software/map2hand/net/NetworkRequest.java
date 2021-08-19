@@ -60,9 +60,9 @@ public class NetworkRequest {
                                         ObjectMapper mapper = new ObjectMapper();
                                         GPXRoute route = mapper.readValue(response.toString(), GPXRoute.class);
                                         Log.d(TAG, route.getName());
-                                        for (GPXLocation ll : route.getPoints()) {
-                                            Log.d(TAG, "Lat:" + ll.getLat() + ", Lon: " + ll.getLon() );
-                                        }
+//                                        for (GPXLocation ll : route.getPoints()) {
+//                                            Log.d(TAG, "Lat:" + ll.getLat() + ", Lon: " + ll.getLon() );
+//                                        }
                                         callback.onRequestCompleted(route);
                                     } catch (JsonProcessingException e) {
                                         Log.d(TAG, "Error getting dev messages: " + e.getMessage());

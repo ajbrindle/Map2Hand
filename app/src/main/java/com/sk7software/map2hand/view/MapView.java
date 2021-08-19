@@ -6,13 +6,16 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PointF;
+import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
 
 import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView;
+import com.sk7software.map2hand.R;
 import com.sk7software.map2hand.db.PreferencesUtil;
 import com.sk7software.map2hand.geo.GPXRoute;
+import com.sk7software.map2hand.geo.GeoLocation;
 
 import java.util.Calendar;
 
@@ -21,7 +24,7 @@ import java.util.Calendar;
  */
 public class MapView extends SubsamplingScaleImageView {
 
-    private PointF mapGPSLocation = new PointF();
+    private GeoLocation mapGPSLocation = new GeoLocation();
     private GPXRoute route;
     private long panDelay;
 
@@ -40,9 +43,8 @@ public class MapView extends SubsamplingScaleImageView {
         super(context, attrs);
     }
 
-    public void setMapGPSLocation(PointF p) {
-        mapGPSLocation.x = p.x;
-        mapGPSLocation.y = p.y;
+    public void setMapGPSLocation(GeoLocation loc) {
+        mapGPSLocation = loc;
     }
 
     public void setRoute(GPXRoute route) {
@@ -85,21 +87,53 @@ public class MapView extends SubsamplingScaleImageView {
             canvas.drawPath(path, routePaint);
         }
 
-        PointF pt = sourceToViewCoord(mapGPSLocation);
+        PointF pt = sourceToViewCoord(new PointF((float)mapGPSLocation.getEasting(), (float)mapGPSLocation.getNorthing()));
 
         if (pt != null && pt.x >= 0 && pt.y >= 0) {
+            boolean showBearing = PreferencesUtil.getInstance().getBooleanPreference(PreferencesUtil.PREFERNECE_BEARING);
+            int radius = PreferencesUtil.getInstance().getIntPreference(PreferencesUtil.PREFERNECE_MARKER_SIZE);
+            double bearing = mapGPSLocation.getBearing();
+
+            if (showBearing && bearing >= 0) {
+                Paint bearPaint = new Paint();
+                bearPaint.setColor(Color.BLUE);
+                bearPaint.setStyle(Paint.Style.FILL_AND_STROKE);
+                canvas.drawPath(calcBearingPath(pt, bearing, radius), bearPaint);
+            }
+
             Paint p = new Paint();
             p.setStrokeWidth(2.0f);
-            int radius = 30;
             p.setColor(Color.BLUE);
             canvas.drawCircle(pt.x, pt.y, radius, p);
-            radius -= 10;
+            radius = (2*radius)/3;
             p.setColor(Color.YELLOW);
             canvas.drawCircle(pt.x, pt.y, radius, p);
-            radius -= 10;
+            radius = radius/2;
             p.setColor(Color.RED);
             canvas.drawCircle(pt.x, pt.y, radius, p);
         }
+    }
+
+    private Path calcBearingPath(PointF pt, double bearing, int radius) {
+        float triangleHt = (float)radius * (float)1.8;
+        PointF triangleTip = new PointF();
+        Path path = new Path();
+        bearing = bearing / 180.0 * Math.PI;
+
+        triangleTip.x = pt.x + (float)(triangleHt * Math.sin(bearing));
+        triangleTip.y = pt.y - (float)(triangleHt * Math.cos(bearing));
+        path.moveTo(triangleTip.x, triangleTip.y);
+
+        PointF triangleVertex = new PointF();
+        triangleVertex.x = pt.x - (float)((float)radius * Math.cos(bearing));
+        triangleVertex.y = pt.y - (float)((float)radius * Math.sin(bearing));
+        path.lineTo(triangleVertex.x, triangleVertex.y);
+
+        triangleVertex.x = pt.x + (float)((float)radius * Math.cos(bearing));
+        triangleVertex.y = pt.y + (float)((float)radius * Math.sin(bearing));
+        path.lineTo(triangleVertex.x, triangleVertex.y);
+        path.lineTo(triangleTip.x, triangleTip.y);
+        return path;
     }
 
     @Override

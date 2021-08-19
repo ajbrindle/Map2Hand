@@ -1,5 +1,12 @@
 package com.sk7software.map2hand;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.Writer;
 import java.util.Calendar;
 import java.util.Date;
 
@@ -27,6 +34,8 @@ import android.widget.Switch;
 import androidx.core.app.ActivityCompat;
 
 import com.davemorrissey.labs.subscaleview.ImageSource;
+import com.google.gson.Gson;
+import com.sk7software.map2hand.db.GPXFile;
 import com.sk7software.map2hand.db.PreferencesUtil;
 import com.sk7software.map2hand.geo.GPXRoute;
 import com.sk7software.map2hand.geo.GeoConvert;
@@ -67,6 +76,7 @@ public class MapActivity extends Activity {
 	private LinearLayout menuPanel;
 	private boolean gpsListen = true;
 	private boolean autoZoom = true;
+	private boolean showBearing = false;
 
 	private Button upButton;
 	private Button downButton;
@@ -152,7 +162,9 @@ public class MapActivity extends Activity {
 		refreshDisplay(null, currentMap, false, false);
 
 		String routeName = mapIntent.getStringExtra("route");
-		setCurrentRoute(routeName);
+		String routeLocal = mapIntent.getStringExtra("local");
+		Log.d(TAG, "Local data: " + routeLocal);
+		setCurrentRoute(routeName, "true".equals(routeLocal));
 
 		if (restoreState) {
 			mapView.setScaleAndCenter(savedInstanceState.getFloat(STATE_SCALE),
@@ -212,7 +224,7 @@ public class MapActivity extends Activity {
 		lm.requestLocationUpdates(
 				LocationManager.GPS_PROVIDER,
 				LM_UPDATE_INTERVAL * 1000,
-				0,
+				1,
 				locationListener);
 
 		mapView.setOnTouchListener(new View.OnTouchListener() {
@@ -262,26 +274,33 @@ public class MapActivity extends Activity {
         }
     }
 
-    private void setCurrentRoute(String routeName) {
+    private void setCurrentRoute(String routeName, boolean isLocal) {
 		if (routeName == null || "".equals(routeName)) {
 			return;
 		}
 
-		NetworkRequest.fetchGPX(ApplicationContextProvider.getContext(), routeName, new NetworkRequest.NetworkCallback() {
-			@Override
-			public void onRequestCompleted(Object callbackData) {
-				currentRoute = (GPXRoute)callbackData;
-				if (currentRoute != null) {
-					currentRoute.calcXY(currentMap, 0);
-					mapView.setRoute(currentRoute);
+		if (isLocal) {
+			Log.d(TAG, "Route is local: " + routeName);
+			currentRoute = GPXRoute.readFromFile(new File(MapFile.MAP_DIR + routeName));
+			currentRoute.calcXY(currentMap, 0);
+			mapView.setRoute(currentRoute);
+		} else {
+			// Fetch route and store locally
+			NetworkRequest.fetchGPX(ApplicationContextProvider.getContext(), routeName, new NetworkRequest.NetworkCallback() {
+				@Override
+				public void onRequestCompleted(Object callbackData) {
+					currentRoute = (GPXRoute)callbackData;
+					if (currentRoute != null) {
+						currentRoute.calcXY(currentMap, 0);
+						mapView.setRoute(currentRoute);
+						GPXRoute.writeToFile(currentRoute, routeName);
+					}
 				}
-			}
 
-			@Override
-			public void onError(Exception e) {
-
-			}
-		});
+				@Override
+				public void onError(Exception e) { }
+			});
+		}
 	}
 
 	private void initialisePanel() {
@@ -317,6 +336,22 @@ public class MapActivity extends Activity {
 			}
 		});
 
+		SeekBar seekMarker = (SeekBar)findViewById(R.id.seekMarker);
+		seekMarker.setProgress(PreferencesUtil.getInstance().getIntPreference(PreferencesUtil.PREFERNECE_MARKER_SIZE));
+		seekMarker.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+			int progressChangedValue = 0;
+
+			public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+				PreferencesUtil.getInstance().addPreference(PreferencesUtil.PREFERNECE_MARKER_SIZE, progress);
+				mapView.invalidate();
+			}
+			public void onStartTrackingTouch(SeekBar seekBar) {
+			}
+
+			public void onStopTrackingTouch(SeekBar seekBar) {
+			}
+		});
+
 		Switch swiGPS = (Switch)findViewById(R.id.swiGPS);
 		gpsListen = PreferencesUtil.getInstance().getBooleanPreference(PreferencesUtil.PREFERNECE_GPS);
 		swiGPS.setChecked(gpsListen);
@@ -336,6 +371,16 @@ public class MapActivity extends Activity {
 				autoZoom = isChecked;
 			}
 		});
+
+		Switch swiBearing = (Switch)findViewById(R.id.swiBearing);
+		showBearing = PreferencesUtil.getInstance().getBooleanPreference(PreferencesUtil.PREFERNECE_BEARING);
+		swiBearing.setChecked(showBearing);
+		swiBearing.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+			public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+				PreferencesUtil.getInstance().addPreference(PreferencesUtil.PREFERNECE_BEARING, isChecked);
+				showBearing = isChecked;
+			}
+		});
 	}
 
 	private void checkEdges(MapAction action) {
@@ -353,11 +398,11 @@ public class MapActivity extends Activity {
 			float midN = (topN + bottomN) / 2;
 			float offset = 5 * (float) currentMap.getResolution();
 
-			PointF checkUp = new PointF(midE, topN + offset);
-			PointF checkDown = new PointF(midE, bottomN - offset);
-			PointF checkLeft = new PointF(leftE - offset, midN);
-			PointF checkRight = new PointF(rightE + offset, midN);
-			PointF checkZoom = new PointF(midE, midN);
+			GeoLocation checkUp = new GeoLocation(midE, topN + offset);
+			GeoLocation checkDown = new GeoLocation(midE, bottomN - offset);
+			GeoLocation checkLeft = new GeoLocation(leftE - offset, midN);
+			GeoLocation checkRight = new GeoLocation(rightE + offset, midN);
+			GeoLocation checkZoom = new GeoLocation(midE, midN);
 
 //		Log.d(TAG, "Up: " + checkUp.x + "," + checkUp.y);
 //		Log.d(TAG, "Down: " + checkDown.x + "," + checkDown.y);
@@ -372,10 +417,11 @@ public class MapActivity extends Activity {
 		}
 	}
 
-	private boolean checkAndDoAction(MapAction buttonAction, PointF point, Button button, MapAction action) {
+	private boolean checkAndDoAction(MapAction buttonAction, GeoLocation geoLoc, Button button, MapAction action) {
 		MapFile map = null;
 		boolean keepScale = true;
 		boolean zooming = (buttonAction == MapAction.ZOOM_IN || buttonAction == MapAction.ZOOM_OUT);
+		PointF point = new PointF((float)geoLoc.getEasting(), (float)geoLoc.getNorthing());
 
 		if (!MapController.isPointOnMap(point, currentMap)) {
 			map = MapController.hasMap(point, currentMap);
@@ -396,7 +442,7 @@ public class MapActivity extends Activity {
 					autoZoom = false;
 					PreferencesUtil.getInstance().addPreference(PreferencesUtil.PREFERNECE_ZOOM, false);
 				}
-				refreshDisplay(point, map, keepScale, false);
+				refreshDisplay(geoLoc, map, keepScale, false);
 				return true;
 			}
 		} else {
@@ -428,17 +474,21 @@ public class MapActivity extends Activity {
 		                geoLoc.setLatitude(loc.getLatitude());
 		                geoLoc.setLongitude(loc.getLongitude());
 		                geoLoc = GeoConvert.ConvertLLToGrid(currentMap.getProjection(), geoLoc, 0);
-						PointF mapPoint = new PointF((float)geoLoc.getEasting(), (float)geoLoc.getNorthing());
+		                if (loc.hasBearing()) {
+							geoLoc.setBearing(loc.getBearing());
+						} else {
+		                	geoLoc.setBearing(-999);
+						}
 
 		                // Check for better map
 						MapFile newMap = MapController.getBestMap(geoLoc, currentMap, autoZoom);
 						if (newMap != null && !newMap.equals(currentMap)) {
 							Log.d(TAG, "Map changed to: " + newMap.getName());
 							boolean resChanged = MapController.isDifferentResolution(currentMap.getResolution(), newMap.getResolution());
-							refreshDisplay(mapPoint, newMap, !resChanged, true);
+							refreshDisplay(geoLoc, newMap, !resChanged, true);
 						} else if (Calendar.getInstance().getTimeInMillis() > mapView.getPanDelay()) {
 							// Show location on map
-							refreshDisplay(mapPoint, null, true, true);
+							refreshDisplay(geoLoc, null, true, true);
 							uploadPosition(loc);
 						}
 						checkEdges(MapAction.CHECK_ONLY);
@@ -491,7 +541,7 @@ public class MapActivity extends Activity {
 	//		newMap = new map to zoom to
 	//		keepScale = false
 	//		locIsGPS = false
-    private void refreshDisplay(PointF centre, MapFile newMap, boolean keepScale, boolean locIsGPS) {
+    private void refreshDisplay(GeoLocation centre, MapFile newMap, boolean keepScale, boolean locIsGPS) {
 //    	Log.d(TAG, "New map: " + (newMap != null ? newMap.getName() : "null"));
 //    	Log.d(TAG, "Point: " + (centre != null ? centre.x + "," + centre.y : "null"));
 //    	Log.d(TAG, "Keep scale: " + keepScale);
@@ -512,11 +562,13 @@ public class MapActivity extends Activity {
 			mapPoint.x = currentMap.getWidthPix()/2;
 			mapPoint.y = currentMap.getHeightPix()/2;
 		} else {
-			mapPoint.x = (float) ((centre.x - currentMap.getTopLeftE()) / currentMap.getResolution());
-			mapPoint.y = (float) ((currentMap.getTopLeftN() - centre.y) / currentMap.getResolution());
+			mapPoint.x = (float) ((centre.getEasting() - currentMap.getTopLeftE()) / currentMap.getResolution());
+			mapPoint.y = (float) ((currentMap.getTopLeftN() - centre.getNorthing()) / currentMap.getResolution());
 			Log.d(TAG, "Map point: " + mapPoint.x + "," + mapPoint.y);
 			if (locIsGPS) {
-				mapView.setMapGPSLocation(mapPoint);
+				GeoLocation mapGeoLoc = new GeoLocation(mapPoint.x, mapPoint.y);
+				mapGeoLoc.setBearing(centre.getBearing());
+				mapView.setMapGPSLocation(mapGeoLoc);
 			}
 		}
 

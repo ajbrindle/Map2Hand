@@ -36,6 +36,7 @@ public class Map2HandActivity extends Activity {
 	private ArrayList<HashMap<String,String>> routeList = new ArrayList<HashMap<String,String>>();
 	private int selectedRoute;
 	private String currentRoute;
+	private String routeIsLocal;
 	private ListView routeListView;
 	private SimpleAdapter routeAdapter;
 
@@ -111,6 +112,7 @@ public class Map2HandActivity extends Activity {
         		Intent i = new Intent(ApplicationContextProvider.getContext(), MapActivity.class);
 				i.putExtra("map", currentMap);
 				i.putExtra("route", currentRoute);
+				i.putExtra("local", routeIsLocal);
         		startActivityForResult(i, REQUEST_MAP_VIEW);
         	}
         });
@@ -151,6 +153,7 @@ public class Map2HandActivity extends Activity {
 				} else if (data.hasExtra("route")) {
 					String selRoute = data.getStringExtra("routeFile");
 					String selRouteDesc = data.getStringExtra("route");
+					routeIsLocal = String.valueOf(data.getBooleanExtra("local", false));
 					HashMap<String, String> h = new HashMap<String, String>();
 					h = routeList.get(this.selectedRoute);
 					h.put("value", selRouteDesc);
@@ -194,6 +197,7 @@ public class Map2HandActivity extends Activity {
 			PreferencesUtil.getInstance().addPreference(PreferencesUtil.PREFERNECE_ZOOM, true);
 			PreferencesUtil.getInstance().addPreference(PreferencesUtil.PREFERNECE_ROUTE_WIDTH, 10);
 			PreferencesUtil.getInstance().addPreference(PreferencesUtil.PREFERNECE_ROUTE_TRANSPARENCY, 30);
+			PreferencesUtil.getInstance().addPreference(PreferencesUtil.PREFERNECE_MARKER_SIZE, 30);
 			PreferencesUtil.getInstance().addPreference(PreferencesUtil.PREFERENCES_INIT, PreferencesUtil.PREFS_SET);
 		}
 	}

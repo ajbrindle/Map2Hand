@@ -6,8 +6,14 @@ public class GeoLocation {
 	private double longitude;
 	private double easting;
 	private double northing;
+	private double bearing;
 	
 	public GeoLocation() {
+	}
+
+	public GeoLocation(double e, double n) {
+		this.easting = e;
+		this.northing = n;
 	}
 
 	public GeoLocation(GeoLocation l) {
@@ -15,6 +21,7 @@ public class GeoLocation {
 		this.setNorthing(l.getNorthing());
 		this.setLatitude(l.getLatitude());
 		this.setLongitude(l.getLongitude());
+		this.setBearing(l.getBearing());
 	}
 	
 	public double getLatitude() {
@@ -48,4 +55,8 @@ public class GeoLocation {
 	public void setNorthing(double northing) {
 		this.northing = northing;
 	}
+
+	public double getBearing() { return bearing; }
+
+	public void setBearing(double bearing) { this.bearing = bearing; }
 }

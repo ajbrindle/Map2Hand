@@ -7,8 +7,10 @@ public class PreferencesUtil {
     public static final String APP_PREFERENCES_KEY = "SK7_MAP2HAND_PREFS";
     public static final String PREFERNECE_GPS = "PREF_GPS";
     public static final String PREFERNECE_ZOOM = "PREF_ZOOM";
+    public static final String PREFERNECE_BEARING = "PREF_BEARING";
     public static final String PREFERNECE_ROUTE_TRANSPARENCY = "PREF_ROUTE_TRANSPARENCY";
     public static final String PREFERNECE_ROUTE_WIDTH = "PREF_ROUTE_WIDTH";
+    public static final String PREFERNECE_MARKER_SIZE = "PREF_MARKER_SIZE";
     public static final String PREFERENCES_INIT = "PREFS_INIT";
     public static final String PREFS_SET = "Y";
 
